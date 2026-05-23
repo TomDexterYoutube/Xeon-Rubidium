@@ -6,6 +6,7 @@ from pathlib import Path
 # Resolve the ~/.xeon directory
 XEON_DIR = Path.home() / ".xeon"
 COMPILER_SCRIPT = XEON_DIR / "compiler.py"
+DEBUGGER_SCRIPT = XEON_DIR / "debug.py"
 
 def init_project():
     if os.path.exists("src"):
@@ -33,7 +34,15 @@ def build_project():
         print(f"✖ Compiler not found at {COMPILER_SCRIPT}.")
         print("Please ensure Rubidium is installed in ~/.xeon")
         sys.exit(1)
-        
+
+    if DEBUGGER_SCRIPT.exists():
+        print("🔍 Running Rubidium debugger...")
+        debug_cmd = [sys.executable, str(DEBUGGER_SCRIPT), main_file]
+        res = subprocess.run(debug_cmd)
+        if res.returncode != 0:
+            print("✖ Debugger found issues. Fix them before compiling.")
+            sys.exit(1)
+    
     os.makedirs("build", exist_ok=True)
     
     # The executable name defaults to the name of the project folder
