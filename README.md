@@ -77,3 +77,7 @@ xeon init
 xeon run
 
 ```
+
+## NOTES
+
+If you are on Windows when you download Rubidium you must rename the folder after extract to exactly Rubidium and nothing else.
