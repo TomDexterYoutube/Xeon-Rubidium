@@ -19,17 +19,10 @@ echo "[2/6] Cleaning up stale files..."
 rm -rf "$XEON_DIR/Rubidium"
 rm -f "$XEON_DIR/xeon.py" "$XEON_DIR/debug.py"
 
-# 3. Download & Verify
+# 3. Download
 echo "[3/6] Fetching source..."
-if ! curl -L -f "$REPO_URL" -o rubidium.zip; then
+if ! curl -L -f -s "$REPO_URL" -o rubidium.zip; then
     echo "[!] Download failed. Check connection."
-    exit 1
-fi
-
-# Size check ( > 5KB)
-if [ $(wc -c <"rubidium.zip") -lt 5000 ]; then
-    echo "[!] Download corrupt."
-    rm rubidium.zip
     exit 1
 fi
 
@@ -45,9 +38,35 @@ cp -r Rubidium "$XEON_DIR/"
 [ -f "xeon.py" ] && cp xeon.py "$XEON_DIR/"
 [ -f "debug.py" ] && cp debug.py "$XEON_DIR/"
 
+# DELETE EXTRACTED FOLDER AFTER INSTALL
+echo "[*] Cleaning up extracted installer files..."
+rm -rf Rubidium
+
 # 5. Wrapper
 cat << 'EOF' > "$BIN_DIR/xeon"
 #!/bin/bash
+# UPDATE COMMAND LOGIC
+if [ "$1" == "update" ]; then
+    echo "Updating Xeon and Rubidium..."
+    TMP_DIR=$(mktemp -d)
+    cd "$TMP_DIR"
+    curl -L -s "https://github.com/TomDexterYoutube/Rubidium/archive/refs/heads/main.zip" -o rubidium.zip
+    unzip -q rubidium.zip
+    rm rubidium.zip
+    for dir in *Rubidium*; do [ -d "$dir" ] && [ "$dir" != "Rubidium" ] && mv "$dir" Rubidium; done
+    
+    rm -rf "$HOME/.xeon/Rubidium"
+    cp -r Rubidium "$HOME/.xeon/"
+    [ -f "Rubidium/xeon.py" ] && cp Rubidium/xeon.py "$HOME/.xeon/"
+    [ -f "Rubidium/debug.py" ] && cp Rubidium/debug.py "$HOME/.xeon/"
+    
+    cd "$HOME"
+    rm -rf "$TMP_DIR"
+    echo "Update complete!"
+    exit 0
+fi
+
+# Standard Execution
 python3 "$HOME/.xeon/xeon.py" "$@"
 EOF
 chmod +x "$BIN_DIR/xeon"
