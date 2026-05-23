@@ -78,7 +78,7 @@ def run_project():
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: xeon <init|build|run>")
+        print("Usage: xeon <update|init|build|run>")
         sys.exit(1)
         
     cmd = sys.argv[1]
