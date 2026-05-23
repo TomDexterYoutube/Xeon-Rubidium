@@ -31,26 +31,38 @@ Once installed, you can manage your Rubidium projects using the `xeon` command l
 Creates a new project structure in your current directory, generating a `src/` folder and a boilerplate `main.rub` file.
 
 ```bash
+
 xeon init
+
+```
 
 2. Build the Project
 
 Compiles your application starting from src/main.rub. The resulting runnable binary executable will be placed inside a generated build/ directory.
 Bash
 
+```bash
+
 xeon build
+
+```
 
 3. Run the Project
 
 Automatically builds your project and immediately executes the resulting binary in one continuous step.
 Bash
 
+```bash
+
 xeon run
+
+```
 
 Example Workflow
 
-Here is what a standard development session looks like from your terminal:
-Bash
+Here is what a standard development session looks like from your terminal
+
+```bash
 
 # Create a new folder for your application
 mkdir my_application
@@ -63,3 +75,5 @@ xeon init
 
 # Build and execute the code
 xeon run
+
+```
