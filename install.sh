@@ -1,7 +1,6 @@
 #!/bin/bash
 set -e
 
-# Change to script directory for initial install
 cd "$(dirname "$0")"
 
 XEON_DIR="$HOME/.xeon"
@@ -9,8 +8,6 @@ BIN_DIR="$HOME/.local/bin"
 REPO_URL="https://github.com/TomDexterYoutube/Rubidium/archive/refs/heads/main.zip"
 
 echo "[1/5] Checking system..."
-
-# Check required commands
 for cmd in python3 curl unzip; do
     if ! command -v "$cmd" &> /dev/null; then
         echo "[!] Required command '$cmd' is not installed."
@@ -18,13 +15,11 @@ for cmd in python3 curl unzip; do
     fi
 done
 
-# Safe Python version check
 if ! python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 13) else 1)'; then
     echo "[!] Python 3.13+ required. Please update your Python."
     exit 1
 fi
 
-# Use a temporary directory for safe downloading and extraction
 TMP_DIR=$(mktemp -d)
 cd "$TMP_DIR"
 
@@ -37,22 +32,17 @@ fi
 
 echo "[3/5] Extracting..."
 unzip -q -o rubidium.zip
-rm -rf Rubidium # Ensure clean state before renaming
+rm -rf Rubidium 
 for dir in *Rubidium*; do 
     [ -d "$dir" ] && [ "$dir" != "Rubidium" ] && mv "$dir" Rubidium
 done
 
 echo "[4/5] Copying files..."
-mkdir -p "$XEON_DIR/Rubidium" "$BIN_DIR"
+mkdir -p "$XEON_DIR" "$BIN_DIR"
 
-# Standardize path: Everything goes into ~/.xeon/Rubidium/
-cp -rf Rubidium/* "$XEON_DIR/Rubidium/"
+# Copy everything directly into the root of ~/.xeon/
+cp -rf Rubidium/* "$XEON_DIR/"
 
-# Extract executable scripts to the root of ~/.xeon/
-[ -f "Rubidium/xeon.py" ] && cp -f Rubidium/xeon.py "$XEON_DIR/"
-[ -f "Rubidium/debug.py" ] && cp -f Rubidium/debug.py "$XEON_DIR/"
-
-# Clean up initial install temp directory
 cd "$HOME"
 rm -rf "$TMP_DIR"
 
@@ -73,11 +63,9 @@ if [ "$1" == "update" ]; then
             [ -d "$dir" ] && [ "$dir" != "Rubidium" ] && mv "$dir" Rubidium
         done
         
-        # Paths now perfectly match the initial installation
-        mkdir -p "$HOME/.xeon/Rubidium"
-        cp -rf Rubidium/* "$HOME/.xeon/Rubidium/"
-        [ -f "Rubidium/xeon.py" ] && cp -f Rubidium/xeon.py "$HOME/.xeon/"
-        [ -f "Rubidium/debug.py" ] && cp -f Rubidium/debug.py "$HOME/.xeon/"
+        # Overwrite everything directly into the root of ~/.xeon/
+        mkdir -p "$HOME/.xeon"
+        cp -rf Rubidium/* "$HOME/.xeon/"
         
         echo "Update complete!"
     else
@@ -95,7 +83,6 @@ EOF
 
 chmod +x "$BIN_DIR/xeon"
 
-# Path Configuration
 PROFILE_FILE=""
 [ -f "$HOME/.bashrc" ] && PROFILE_FILE="$HOME/.bashrc"
 [ -f "$HOME/.zshrc" ] && PROFILE_FILE="$HOME/.zshrc"
