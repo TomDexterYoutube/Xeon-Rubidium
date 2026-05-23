@@ -1,54 +1,65 @@
 #!/bin/bash
 set -e
+cd "$(dirname "$0")"
 
-# 1. Dependency Check
-echo "Checking system dependencies..."
-if ! command -v clang &> /dev/null || ! command -v python3 &> /dev/null; then
-    echo "Required dependencies (Clang or Python3) are missing."
-    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        sudo apt update && sudo apt install -y python3 clang build-essential
-    elif [[ "$OSTYPE" == "darwin"* ]]; then
-        xcode-select --install
-        echo "Please complete the macOS prompt, then re-run this script."
-        exit 1
-    fi
-fi
-
-# 2. Installation
-echo "Installing Xeon and Rubidium..."
 XEON_DIR="$HOME/.xeon"
 BIN_DIR="$HOME/.local/bin"
+REPO_URL="https://github.com/TomDexterYoutube/Rubidium/archive/refs/heads/main.zip"
 
+echo "[1/6] Checking system..."
+# Version Check
+PY_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+if (( $(echo "$PY_VER < 3.8" | bc -l) )); then
+    echo "[!] Python 3.8+ required. Please update your Python."
+    exit 1
+fi
+
+# 2. Cleanup
+echo "[2/6] Cleaning up stale files..."
+rm -rf "$XEON_DIR/Rubidium"
+rm -f "$XEON_DIR/xeon.py" "$XEON_DIR/debug.py"
+
+# 3. Download & Verify
+echo "[3/6] Fetching source..."
+if ! curl -L -f "$REPO_URL" -o rubidium.zip; then
+    echo "[!] Download failed. Check connection."
+    exit 1
+fi
+
+# Size check ( > 5KB)
+if [ $(wc -c <"rubidium.zip") -lt 5000 ]; then
+    echo "[!] Download corrupt."
+    rm rubidium.zip
+    exit 1
+fi
+
+echo "[4/6] Extracting..."
+unzip -q rubidium.zip
+rm rubidium.zip
+for dir in *Rubidium*; do [ -d "$dir" ] && [ "$dir" != "Rubidium" ] && mv "$dir" Rubidium; done
+
+# 4. Installation
+echo "[5/6] Copying files..."
 mkdir -p "$XEON_DIR" "$BIN_DIR"
-cp -r Rubidium*/* "$XEON_DIR/"
-cp xeon.py "$XEON_DIR/"
+cp -r Rubidium "$XEON_DIR/"
+[ -f "xeon.py" ] && cp xeon.py "$XEON_DIR/"
+[ -f "debug.py" ] && cp debug.py "$XEON_DIR/"
 
-# 3. Create Wrapper
+# 5. Wrapper
 cat << 'EOF' > "$BIN_DIR/xeon"
 #!/bin/bash
 python3 "$HOME/.xeon/xeon.py" "$@"
 EOF
 chmod +x "$BIN_DIR/xeon"
 
-# 4. Smart Path Configuration
+# 6. Path Configuration
 PROFILE_FILE=""
-if [ -f "$HOME/.bashrc" ]; then PROFILE_FILE="$HOME/.bashrc"
-elif [ -f "$HOME/.zshrc" ]; then PROFILE_FILE="$HOME/.zshrc"
-elif [ -f "$HOME/.profile" ]; then PROFILE_FILE="$HOME/.profile"; fi
+[ -f "$HOME/.bashrc" ] && PROFILE_FILE="$HOME/.bashrc"
+[ -f "$HOME/.zshrc" ] && PROFILE_FILE="$HOME/.zshrc"
 
-if [ -n "$PROFILE_FILE" ]; then
-    if ! grep -q "$BIN_DIR" "$PROFILE_FILE"; then
-        echo -e "\n# Xeon PATH configuration\nexport PATH=\"\$HOME/.local/bin:\$PATH\"" >> "$PROFILE_FILE"
-        echo "✔ Added $BIN_DIR to $PROFILE_FILE"
-    fi
-    
-    # 5. Automatically source the profile
-    echo "✔ Applying configuration to current session..."
-    source "$PROFILE_FILE"
-else
-    echo "⚠ Could not detect a shell profile. Please add $BIN_DIR to your PATH manually."
+if [ -n "$PROFILE_FILE" ] && ! grep -q "$BIN_DIR" "$PROFILE_FILE"; then
+    echo "export PATH=\"$BIN_DIR:\$PATH\"" >> "$PROFILE_FILE"
+    echo "✔ Added to PATH. Please restart terminal."
 fi
 
-echo "--------------------------------------------------------"
-echo "Installation complete!, run 'source ~/.bashrc' to enable xeon!"
-
+echo "Installation complete!"
