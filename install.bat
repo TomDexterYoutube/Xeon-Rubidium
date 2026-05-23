@@ -1,16 +1,14 @@
 @echo off
 setlocal enabledelayedexpansion
 
-cd /d "%~dp0"
-
 :: 1. Variables & Setup
 set "XEON_DIR=%USERPROFILE%\.xeon"
 set "BIN_DIR=%USERPROFILE%\.xeon\bin"
 set "RUBIDIUM_URL=https://github.com/TomDexterYoutube/Rubidium/archive/refs/heads/main.zip"
 
 echo [1/5] Environment Check...
-:: Python Version Check (Must be 3.13+)
-python -c "import sys; exit(0 if sys.version_info >= (3,13) else 1)" >nul 2>&1
+
+python -c "import sys; sys.exit(0 if sys.version_info >= (3,13) else 1)" >nul 2>&1
 if %ERRORLEVEL% neq 0 (
     echo [!] Python 3.13+ not detected. Attempting install...
     winget install Python.Python.3 -e --accept-package-agreements
@@ -22,23 +20,38 @@ if %ERRORLEVEL% neq 0 (
     winget install LLVM.LLVM -e --accept-package-agreements
 )
 
+set "TMP_DIR=%TEMP%\xeon_install_tmp"
+if exist "%TMP_DIR%" rmdir /s /q "%TMP_DIR%"
+mkdir "%TMP_DIR%"
+cd /d "%TMP_DIR%"
+
 :: 2. Download
 echo [2/5] Fetching Rubidium...
-powershell -Command "$wc = New-Object System.Net.WebClient; try { $wc.DownloadFile('%RUBIDIUM_URL%', 'rubidium.zip') } catch { exit 1 }"
-if %ERRORLEVEL% neq 0 ( echo [!] Download failed. Check internet/proxy. & pause & exit /b 1 )
+curl.exe -L -f -s "%RUBIDIUM_URL%" -o rubidium.zip
+if %ERRORLEVEL% neq 0 ( 
+    echo [!] Download failed. Check internet/proxy. 
+    pause 
+    exit /b 1 
+)
 
 echo [3/5] Extracting...
-:: -Force ensures it overwrites existing extracted files silently
 powershell -Command "Expand-Archive -Path 'rubidium.zip' -DestinationPath '.' -Force"
-for /d %%D in (*Rubidium*) do ( if /i not "%%~nxD"=="Rubidium" ren "%%D" "Rubidium" )
+
+if exist "Rubidium" rmdir /s /q "Rubidium"
+for /d %%D in (*Rubidium*) do (
+    if /i not "%%~nxD"=="Rubidium" ren "%%D" "Rubidium"
+)
 
 :: 3. Installation
-echo [4/5] Copying files (overwriting existing)...
-if not exist "%XEON_DIR%\Rubidium" mkdir "%XEON_DIR%\Rubidium"
+echo [4/5] Copying files...
+if not exist "%XEON_DIR%" mkdir "%XEON_DIR%"
 if not exist "%BIN_DIR%" mkdir "%BIN_DIR%"
-xcopy /E /I /Y "Rubidium\*" "%XEON_DIR%\Rubidium\" >nul
-if exist "xeon.py" copy /Y "xeon.py" "%XEON_DIR%\" >nul
-if exist "debug.py" copy /Y "debug.py" "%XEON_DIR%\" >nul
+
+:: Copy everything directly into the root of ~/.xeon/
+xcopy /E /I /Y "Rubidium\*" "%XEON_DIR%\" >nul
+
+cd /d "%~dp0"
+rmdir /s /q "%TMP_DIR%"
 
 :: 4. Create Wrapper & PATH
 echo [5/5] Finalizing...
@@ -50,24 +63,29 @@ echo exit /b %%ERRORLEVEL%%
 echo.
 echo :update
 echo echo Updating Xeon and Rubidium...
-echo set "TEMP_DIR=%%TEMP%%\xeon_update"
-echo if not exist "%%TEMP_DIR%%" mkdir "%%TEMP_DIR%%"
-echo cd /d "%%TEMP_DIR%%"
-echo powershell -Command "$wc = New-Object System.Net.WebClient; $wc.DownloadFile('%RUBIDIUM_URL%', 'rubidium.zip')"
+echo set "UPDATE_TMP=%%TEMP%%\xeon_update"
+echo if exist "%%UPDATE_TMP%%" rmdir /s /q "%%UPDATE_TMP%%"
+echo mkdir "%%UPDATE_TMP%%"
+echo cd /d "%%UPDATE_TMP%%"
+echo curl.exe -L -f -s "%RUBIDIUM_URL%" -o rubidium.zip
 echo powershell -Command "Expand-Archive -Path 'rubidium.zip' -DestinationPath '.' -Force"
+echo if exist "Rubidium" rmdir /s /q "Rubidium"
 echo for /d %%%%D in (*Rubidium*^) do ren "%%%%D" "Rubidium"
-echo :: Overwrite without deleting
-echo if not exist "%XEON_DIR%\Rubidium" mkdir "%XEON_DIR%\Rubidium"
-echo xcopy /E /I /Y "Rubidium\*" "%XEON_DIR%\Rubidium\" ^>nul
-echo if exist "Rubidium\xeon.py" copy /Y "Rubidium\xeon.py" "%XEON_DIR%\" ^>nul
-echo if exist "Rubidium\debug.py" copy /Y "Rubidium\debug.py" "%XEON_DIR%\" ^>nul
-echo cd /d "%%~dp0"
-echo rmdir /s /q "%%TEMP_DIR%%"
+echo :: Overwrite without deleting directly into the root of ~/.xeon/
+echo if not exist "%XEON_DIR%" mkdir "%XEON_DIR%"
+echo xcopy /E /I /Y "Rubidium\*" "%XEON_DIR%\" ^>nul
+echo cd /d "%USERPROFILE%"
+echo rmdir /s /q "%%UPDATE_TMP%%"
 echo echo Update complete!
 echo exit /b 0
 ) > "%BIN_DIR%\xeon.bat"
 
 powershell -Command "$p = [Environment]::GetEnvironmentVariable('Path', 'User'); if (-not $p.Contains('%BIN_DIR%')) { [Environment]::SetEnvironmentVariable('Path', '%BIN_DIR%;' + $p, 'User') }"
 
-echo Installation complete! Please restart your terminal.
+echo.
+echo ========================================================
+echo Installation complete! 
+echo Please RESTART your terminal for the PATH to take effect.
+echo Run 'xeon' to start or 'xeon update' to update.
+echo ========================================================
 pause
