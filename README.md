@@ -14,12 +14,12 @@ To get started with Xeon, you need to link it with the core Rubidium compiler fi
 
 1. **Download the Compiler:** Retrieve the latest version of the Rubidium compiler from the official repository:
    [https://github.com/TomDexterYoutube/Rubidium](https://github.com/TomDexterYoutube/Rubidium)
-2. **Prepare the Directory:** Extract the downloaded files and place them directly into the `rubidium/` folder within your downloaded Xeon directory.
+2. **Prepare the Directory:** Extract the downloaded files and place them directly into the `Rubidium/` folder within your downloaded Xeon directory.
 3. **Execute the Installer:** Run the appropriate installation script for your operating system to install Xeon globally. **The script will automatically detect and install required dependencies like Python 3 and Clang.**
    * **Windows:** Run `install.bat`
    * **Linux / macOS:** Run `bash install.sh`
 
-> **Note:** The installer will automatically configure your `~/.xeon` directory and add the `xeon` command to your system path. You can update your compiler version at any time by simply replacing the files inside the `~/.xeon` folder.
+> **Note:** The installer will automatically configure your `~/.xeon` directory and add the `xeon` command to your system path. By doing the install process it will rewrite the old files and update.
 
 ---
 
@@ -78,6 +78,7 @@ xeon run
 
 ```
 
-## NOTES
+## PLEASE 
 
-If you are on Windows when you download Rubidium you must rename the folder after extract to exactly Rubidium and nothing else.
+I dont want any money you can support this project by reporting bugs or giving sugestions!
+Post stuff in the issues section
