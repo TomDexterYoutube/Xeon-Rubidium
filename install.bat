@@ -30,7 +30,7 @@ if not exist "%XEON_DIR%" mkdir "%XEON_DIR%"
 if not exist "%BIN_DIR%" mkdir "%BIN_DIR%"
 
 :: Copy compiler files
-xcopy /E /I /Y rubidium\* "%XEON_DIR%\"
+xcopy /E /I /Y Rubidium\* "%XEON_DIR%\"
 copy /Y xeon.py "%XEON_DIR%\"
 
 :: 4. Create Wrapper
