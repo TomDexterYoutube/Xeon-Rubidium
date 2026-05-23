@@ -9,10 +9,10 @@ set "BIN_DIR=%USERPROFILE%\.xeon\bin"
 set "RUBIDIUM_URL=https://github.com/TomDexterYoutube/Rubidium/archive/refs/heads/main.zip"
 
 echo [1/6] Environment Check...
-:: Python Version Check (Must be 3.8+)
-python -c "import sys; exit(0 if sys.version_info >= (3,8) else 1)" >nul 2>&1
+:: Python Version Check (Must be 3.13+)
+python -c "import sys; exit(0 if sys.version_info >= (3,13) else 1)" >nul 2>&1
 if %ERRORLEVEL% neq 0 (
-    echo [!] Python 3.8+ not detected. Attempting install...
+    echo [!] Python 3.13+ not detected. Attempting install...
     winget install Python.Python.3 -e --accept-package-agreements
 )
 
