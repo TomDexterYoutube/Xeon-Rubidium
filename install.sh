@@ -9,8 +9,8 @@ REPO_URL="https://github.com/TomDexterYoutube/Rubidium/archive/refs/heads/main.z
 echo "[1/6] Checking system..."
 # Version Check
 PY_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
-if (( $(echo "$PY_VER < 3.8" | bc -l) )); then
-    echo "[!] Python 3.8+ required. Please update your Python."
+if (( $(echo "$PY_VER < 3.13" | bc -l) )); then
+    echo "[!] Python 3.13+ required. Please update your Python."
     exit 1
 fi
 
