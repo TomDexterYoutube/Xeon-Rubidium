@@ -15,7 +15,7 @@ Xeon streamlines the process of initializing, building, and running your Rubidiu
    * **Linux / macOS:** Run `bash install.sh`
 2. **Lol** There is no step 2 its just that easy.
 
-> **Note:** The installer will automatically configure your `~/.xeon` directory and add the `xeon` command to your system path. By doing the install process it will rewrite the old files and update.
+> **Note:** The installer will automatically configure your `~/.xeon` directory and add the `xeon` command to your system path.
 
 ---
 
