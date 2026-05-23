@@ -46,10 +46,10 @@ if [ "$1" == "update" ]; then
     for dir in *Rubidium*; do [ -d "$dir" ] && [ "$dir" != "Rubidium" ] && mv "$dir" Rubidium; done
     
     # Overwrite without deleting
-    mkdir -p "$HOME/.xeon/Rubidium"
-    cp -rf Rubidium/* "$HOME/.xeon/Rubidium/"
-    [ -f "Rubidium/xeon.py" ] && cp -f Rubidium/xeon.py "$HOME/.xeon/"
-    [ -f "Rubidium/debug.py" ] && cp -f Rubidium/debug.py "$HOME/.xeon/"
+    mkdir -p "$HOME/.xeon"
+    cp -rf Rubidium/* "$HOME/.xeon"
+    [ -f "xeon.py" ] && cp -f xeon.py "$HOME/.xeon/"
+    [ -f "debug.py" ] && cp -f debug.py "$HOME/.xeon/"
     
     cd "$HOME"
     rm -rf "$TMP_DIR"
