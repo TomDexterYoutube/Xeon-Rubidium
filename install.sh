@@ -33,7 +33,7 @@ mkdir -p "$XEON_DIR"
 mkdir -p "$BIN_DIR"
 
 # Copy the compiler files and the build tool to the home directory
-cp -r rubidium/* "$XEON_DIR/"
+cp -r Rubidium*/* "$XEON_DIR/"
 cp xeon.py "$XEON_DIR/"
 
 # Create the executable wrapper
