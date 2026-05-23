@@ -28,13 +28,10 @@ if exist "%XEON_DIR%\Rubidium" rmdir /s /q "%XEON_DIR%\Rubidium"
 if exist "%XEON_DIR%\xeon.py" del /f /q "%XEON_DIR%\xeon.py"
 if exist "%XEON_DIR%\debug.py" del /f /q "%XEON_DIR%\debug.py"
 
-:: 3. Download & Verify
+:: 3. Download
 echo [3/6] Fetching Rubidium...
 powershell -Command "$wc = New-Object System.Net.WebClient; try { $wc.DownloadFile('%RUBIDIUM_URL%', 'rubidium.zip') } catch { exit 1 }"
 if %ERRORLEVEL% neq 0 ( echo [!] Download failed. Check internet/proxy. & pause & exit /b 1 )
-
-:: Verify size (must be > 5kb)
-for %%I in (rubidium.zip) do if %%~zI LSS 5000 ( echo [!] Download corrupt. & del rubidium.zip & pause & exit /b 1 )
 
 echo [4/6] Extracting...
 powershell -Command "Expand-Archive -Path 'rubidium.zip' -DestinationPath '.' -Force; Remove-Item 'rubidium.zip'"
@@ -43,13 +40,42 @@ for /d %%D in (*Rubidium*) do ( if /i not "%%~nxD"=="Rubidium" ren "%%D" "Rubidi
 :: 4. Installation
 echo [5/6] Copying files...
 if not exist "%XEON_DIR%" mkdir "%XEON_DIR%"
+if not exist "%BIN_DIR%" mkdir "%BIN_DIR%"
 xcopy /E /I /Y "Rubidium" "%XEON_DIR%\Rubidium\" >nul
 if exist "xeon.py" copy /Y "xeon.py" "%XEON_DIR%\" >nul
 if exist "debug.py" copy /Y "debug.py" "%XEON_DIR%\" >nul
 
+:: DELETE EXTRACTED FOLDER AFTER INSTALL
+echo [*] Cleaning up extracted installer files...
+if exist "Rubidium" rmdir /s /q "Rubidium"
+
 :: 5. Create Wrapper & PATH
 echo [6/6] Finalizing...
-( echo @echo off & echo python "%XEON_DIR%\xeon.py" %%* ) > "%BIN_DIR%\xeon.bat"
+(
+echo @echo off
+echo if /I "%%~1"=="update" goto :update
+echo python "%XEON_DIR%\xeon.py" %%*
+echo exit /b %%ERRORLEVEL%%
+echo.
+echo :update
+echo echo Updating Xeon and Rubidium...
+echo set "TEMP_DIR=%%TEMP%%\xeon_update"
+echo if exist "%%TEMP_DIR%%" rmdir /s /q "%%TEMP_DIR%%"
+echo mkdir "%%TEMP_DIR%%"
+echo cd /d "%%TEMP_DIR%%"
+echo powershell -Command "$wc = New-Object System.Net.WebClient; $wc.DownloadFile('%RUBIDIUM_URL%', 'rubidium.zip')"
+echo powershell -Command "Expand-Archive -Path 'rubidium.zip' -DestinationPath '.' -Force; Remove-Item 'rubidium.zip'"
+echo for /d %%%%D in (*Rubidium*^) do ren "%%%%D" "Rubidium"
+echo if exist "%XEON_DIR%\Rubidium" rmdir /s /q "%XEON_DIR%\Rubidium"
+echo xcopy /E /I /Y "Rubidium" "%XEON_DIR%\Rubidium\" ^>nul
+echo if exist "Rubidium\xeon.py" copy /Y "Rubidium\xeon.py" "%XEON_DIR%\" ^>nul
+echo if exist "Rubidium\debug.py" copy /Y "Rubidium\debug.py" "%XEON_DIR%\" ^>nul
+echo cd /d "%%~dp0"
+echo rmdir /s /q "%%TEMP_DIR%%"
+echo echo Update complete!
+echo exit /b 0
+) > "%BIN_DIR%\xeon.bat"
+
 powershell -Command "$p = [Environment]::GetEnvironmentVariable('Path', 'User'); if (-not $p.Contains('%BIN_DIR%')) { [Environment]::SetEnvironmentVariable('Path', '%BIN_DIR%;' + $p, 'User') }"
 
 echo Installation complete! Please restart your terminal.
