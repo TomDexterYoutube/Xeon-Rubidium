@@ -14,7 +14,7 @@ def init_project():
     
     os.makedirs("src")
     with open("src/main.rub", "w") as f:
-        f.write('use thread\n\nfn main() {\n    print("Hello, Rubidium!")\n}\n')
+        f.write('fn main() {\n    print("Im, working fine!")\n    print("Ready to start coding?)\n}\n')
         
     print("✔ Initialized new Rubidium project in ./src")
 
