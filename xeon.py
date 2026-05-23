@@ -2,7 +2,6 @@ import sys
 import os
 import subprocess
 from pathlib import Path
-import glob
 
 # Resolve the ~/.xeon directory
 XEON_DIR = Path.home() / ".xeon"
@@ -24,6 +23,12 @@ def build_project():
         print("✖ No src/ directory found. Run 'xeon init' first.")
         sys.exit(1)
         
+    # Enforce main.rub as the strict entry point (like Rust's main.rs)
+    main_file = "src/main.rub"
+    if not os.path.exists(main_file):
+        print(f"✖ Entry point '{main_file}' not found.")
+        sys.exit(1)
+        
     if not COMPILER_SCRIPT.exists():
         print(f"✖ Compiler not found at {COMPILER_SCRIPT}.")
         print("Please ensure Rubidium is installed in ~/.xeon")
@@ -31,12 +36,6 @@ def build_project():
         
     os.makedirs("build", exist_ok=True)
     
-    # Grab all .rub files in the src directory for multi-file compilation
-    src_files = glob.glob("src/*.rub")
-    if not src_files:
-        print("✖ No .rub files found in src/")
-        sys.exit(1)
-        
     # The executable name defaults to the name of the project folder
     project_name = Path(os.getcwd()).name
     out_name = f"build/{project_name}"
@@ -45,7 +44,9 @@ def build_project():
         
     print(f"Compiling {project_name}...")
     
-    cmd = [sys.executable, str(COMPILER_SCRIPT)] + src_files + [out_name]
+    # Pass ONLY main.rub to the compiler.
+    # The compiler will automatically trace and pull in other files via import/use.
+    cmd = [sys.executable, str(COMPILER_SCRIPT), main_file, out_name]
     res = subprocess.run(cmd)
     
     if res.returncode != 0:
