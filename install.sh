@@ -15,6 +15,7 @@ REPO_URL="https://github.com/TomDexterYoutube/Rubidium/archive/refs/heads/main.z
 
 mkdir -p "$XEON_DIR" "$BIN_DIR"
 cp xeon.py "$XEON_DIR/"
+cp debug.py "$XEON_DIR/"
 
 echo "[1/5] Checking system..."
 for cmd in python3 curl unzip; do
