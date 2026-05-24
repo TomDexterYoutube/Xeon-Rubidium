@@ -47,7 +47,6 @@ echo [4/5] Copying files...
 if not exist "%XEON_DIR%" mkdir "%XEON_DIR%"
 if not exist "%BIN_DIR%" mkdir "%BIN_DIR%"
 
-:: Copy everything directly into the root of ~/.xeon/
 xcopy /E /I /Y "Rubidium\*" "%XEON_DIR%\" >nul
 
 cd /d "%~dp0"
@@ -71,7 +70,6 @@ echo curl.exe -L -f -s "%RUBIDIUM_URL%" -o rubidium.zip
 echo powershell -Command "Expand-Archive -Path 'rubidium.zip' -DestinationPath '.' -Force"
 echo if exist "Rubidium" rmdir /s /q "Rubidium"
 echo for /d %%%%D in (*Rubidium*^) do ren "%%%%D" "Rubidium"
-echo :: Overwrite without deleting directly into the root of ~/.xeon/
 echo if not exist "%XEON_DIR%" mkdir "%XEON_DIR%"
 echo xcopy /E /I /Y "Rubidium\*" "%XEON_DIR%\" ^>nul
 echo cd /d "%USERPROFILE%"
