@@ -13,6 +13,9 @@ XEON_DIR="$HOME/.xeon"
 BIN_DIR="$HOME/.local/bin"
 REPO_URL="https://github.com/TomDexterYoutube/Rubidium/archive/refs/heads/main.zip"
 
+mkdir -p "$XEON_DIR" "$BIN_DIR"
+cp xeon.py "$XEON_DIR/"
+
 echo "[1/5] Checking system..."
 for cmd in python3 curl unzip; do
     if ! command -v "$cmd" &> /dev/null; then
@@ -44,7 +47,6 @@ for dir in *Rubidium*; do
 done
 
 echo "[4/5] Copying files..."
-mkdir -p "$XEON_DIR" "$BIN_DIR"
 
 # FIX: Using '.' instead of '*' ensures hidden files/configs are also copied
 cp -rf Rubidium/. "$XEON_DIR/"
@@ -58,7 +60,7 @@ cat << 'EOF' > "$BIN_DIR/xeon"
 set -e
 
 if [ "$1" == "update" ]; then
-    echo "Updating Xeon and Rubidium..."
+    echo "Updating Rubidium..."
     UPDATE_TMP=$(mktemp -d)
     cd "$UPDATE_TMP"
     
@@ -101,5 +103,5 @@ echo ""
 echo "========================================================"
 echo "Installation complete!"
 echo "Run 'source ~/.bashrc' (or restart your terminal) to apply changes."
-echo "Run 'xeon' to start or 'xeon update' to update."
+echo "Run 'xeon' to start!"
 echo "========================================================"
