@@ -1,6 +1,12 @@
 #!/bin/bash
 set -e
 
+# Prevent running as root, which would install to /root instead of the user's home
+if [ "$EUID" -eq 0 ]; then
+  echo "[!] Please run this script as a normal user, not with sudo."
+  exit 1
+fi
+
 cd "$(dirname "$0")"
 
 XEON_DIR="$HOME/.xeon"
@@ -40,8 +46,8 @@ done
 echo "[4/5] Copying files..."
 mkdir -p "$XEON_DIR" "$BIN_DIR"
 
-# Copy everything directly into the root of ~/.xeon/
-cp -rf Rubidium/* "$XEON_DIR/"
+# FIX: Using '.' instead of '*' ensures hidden files/configs are also copied
+cp -rf Rubidium/. "$XEON_DIR/"
 
 cd "$HOME"
 rm -rf "$TMP_DIR"
@@ -63,9 +69,9 @@ if [ "$1" == "update" ]; then
             [ -d "$dir" ] && [ "$dir" != "Rubidium" ] && mv "$dir" Rubidium
         done
         
-        # Overwrite everything directly into the root of ~/.xeon/
         mkdir -p "$HOME/.xeon"
-        cp -rf Rubidium/* "$HOME/.xeon/"
+        # FIX: Ensure hidden files update correctly
+        cp -rf Rubidium/. "$HOME/.xeon/"
         
         echo "Update complete!"
     else
@@ -83,13 +89,17 @@ EOF
 
 chmod +x "$BIN_DIR/xeon"
 
-PROFILE_FILE=""
-[ -f "$HOME/.bashrc" ] && PROFILE_FILE="$HOME/.bashrc"
-[ -f "$HOME/.zshrc" ] && PROFILE_FILE="$HOME/.zshrc"
+# FIX: Add to ALL detected profile files rather than just the last one found
+for profile in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.bash_profile"; do
+    if [ -f "$profile" ] && ! grep -q "$BIN_DIR" "$profile"; then
+        echo "export PATH=\"$BIN_DIR:\$PATH\"" >> "$profile"
+        echo "✔ Added $BIN_DIR to $profile"
+    fi
+done
 
-if [ -n "$PROFILE_FILE" ] && ! grep -q "$BIN_DIR" "$PROFILE_FILE"; then
-    echo "export PATH=\"$BIN_DIR:\$PATH\"" >> "$PROFILE_FILE"
-    echo "✔ Added $BIN_DIR to $PROFILE_FILE. Please restart terminal."
-fi
-
-echo "Installation complete! Run 'xeon' to start or 'xeon update' to update."
+echo ""
+echo "========================================================"
+echo "Installation complete!"
+echo "Run 'source ~/.bashrc' (or restart your terminal) to apply changes."
+echo "Run 'xeon' to start or 'xeon update' to update."
+echo "========================================================"
