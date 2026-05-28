@@ -44,9 +44,9 @@ TOKEN_SPEC = [
     ("ERROR",    r"\berror\b"),
     ("AS",       r"\bas\b"),
     ("LOGIC",    r"\b(?:and|or|not)\b"),
-    ("TYPE",     r"\b(?:i4|i8|i16|i32|i64|i128|i256|f4|f8|f16|f32|f64|f128|f256|str|bool|list|index|dict)\b"),
+    ("TYPE",     r"\b(?:i32|i64|i128|i256|f32|f64|f128|f256|f512|f1024|f2048|str|bool|list|index|dict)\b"),
     ("IDENT",    r"[a-zA-Z_][a-zA-Z0-9_]*"),
-    ("OP",       r"==|!=|<=|>=|->|=|\+|-|\*|/|<|>"),
+    ("OP",       r"==|!=|<=|>=|->|=|\+|-|\*\*|\*/|\*|/|<|>"),
     ("COLON",    r":"),
     ("LPAREN",   r"\("),
     ("RPAREN",   r"\)"),
@@ -399,13 +399,19 @@ class Parser:
         is_mut = False
         if self.current().kind == 'MUT':
             is_mut = True; self.consume('MUT')
-        name = self.consume('IDENT')
+        # Accept both IDENT and TYPE tokens for variable names (e.g., "list" is a TYPE but can be a variable name)
+        if self.current().kind in ('IDENT', 'TYPE'):
+            name = self.consume()
+        else:
+            name = self.consume('IDENT')
         
         v_type = None
         if self.current().kind == 'COLON':
             self.consume('COLON')
             v_type = self.consume('TYPE') if self.current().kind == 'TYPE' else None
-            
+        elif self.current().kind == 'TYPE':
+            v_type = self.consume('TYPE')
+        
         expr = None
         if self.current().kind == 'OP' and self.current().value == '=':
             self.consume('OP')
@@ -504,13 +510,21 @@ class Parser:
 
     def parse_factor(self):
         left = self.parse_primary()
-        while self.current().kind == 'OP' and self.current().value in ('*', '/'):
+        while self.current().kind == 'OP' and self.current().value in ('*', '/', '**'):
             op = self.consume('OP')
             right = self.parse_primary()
             left = BinaryOp(left, op, right, op.line)
         return left
 
     def parse_primary(self):
+        if self.current().kind == 'OP' and self.current().value == '*/':
+            op = self.consume('OP')
+            return UnaryOp(op, self.parse_primary(), op.line)
+
+        if self.current().kind == 'OP' and self.current().value == '-':
+            op = self.consume('OP')
+            return UnaryOp(op, self.parse_primary(), op.line)
+            
         if self.current().kind == 'LOGIC' and self.current().value == 'not':
             op = self.consume('LOGIC')
             return UnaryOp(op, self.parse_primary(), op.line)
@@ -579,7 +593,7 @@ class Parser:
                 if self.current().kind == 'COMMA': self.consume('COMMA')
             self.consume('RBRACE')
             base_expr = DictLiteral(pairs, line)
-        elif tok.kind == 'IDENT' or tok.kind in ('PRINT', 'PRINTLN', 'INPUT', 'FILE_READ', 'FILE_WRITE', 'RANGE', 'THREAD'):
+        elif tok.kind in ('IDENT', 'PRINT', 'PRINTLN', 'INPUT', 'FILE_READ', 'FILE_WRITE', 'RANGE', 'THREAD', 'ERROR'):
             if self.current().kind in ('LPAREN', 'LBRACKET'):
                 close_char = 'RPAREN' if self.current().kind == 'LPAREN' else 'RBRACKET'
                 self.consume()
@@ -591,6 +605,7 @@ class Parser:
                 base_expr = FunctionCall(tok, args, tok.line)
             else:
                 base_expr = Identifier(tok)
+        elif tok.kind == 'TYPE': base_expr = Literal(tok, tok.value)
         else:
             print(f"\033[1;31merror[P002]\033[0m: Unexpected token `{tok.kind}` in expression at line {tok.line}")
             self.errors += 1
@@ -650,7 +665,7 @@ class StaticAnalyzer:
         self.loop_depth = 0
         self.in_try_block = False
         
-        self.builtins = {"print", "println", "input", "file_read", "file_write", "thread", "thread.wait", "range"}
+        self.builtins = {"print", "println", "input", "file_read", "file_write", "thread", "thread.wait", "range", "random", "time", "time.wait", "time.timer_start", "time.timer_pause", "time.timer_stop", "time.timer_read"}
         self.errors, self.warnings = 0, 0
         self.filepath, self.source_lines = filepath, source_lines
         self.is_main_file = is_main_file
@@ -703,17 +718,26 @@ class StaticAnalyzer:
             if expr.token.kind == 'NUMBER': return "Float" if '.' in expr.token.value else "Int"
             if expr.token.kind == 'STRING': return "String"
             if expr.token.kind == 'BOOL': return "Bool"
+            if expr.token.kind == 'TYPE': return "Int" if expr.value.startswith('i') else ("Float" if expr.value.startswith('f') else "Unknown")
         elif isinstance(expr, InterpolatedStr): return "String"
         elif isinstance(expr, Identifier):
             meta = self.get_var(expr.token.value)
             if meta: return meta.type_cat
-        elif isinstance(expr, TypeCast): return self.get_type_category(expr.target_type.value)
-        elif isinstance(expr, ListLiteral): return f"List<{self.infer_type(expr.elements[0])}>" if expr.elements else "List<Unknown>"
-        elif isinstance(expr, IndexLiteral): return f"Index<Unknown,Unknown>"
-        elif isinstance(expr, DictLiteral): return f"Dict<Unknown,Unknown>"
+            # Handle module identifiers
+            if expr.token.value in ("time", "random", "thread"): return expr.token.value
+            return "Unknown"
         elif isinstance(expr, FunctionCall):
             name = expr.name.value
             if name == "range": return "List<Int>"
+            if name == "random":
+                type_name = ""
+                if len(expr.args) >= 3:
+                    arg3 = expr.args[2]
+                    if isinstance(arg3, Identifier) and arg3.token.value in ("f32", "f64", "f128", "f256", "f512", "f1024", "f2048"):
+                        type_name = arg3.token.value
+                if type_name.startswith("f"):
+                    return "Float"
+                return "Int"
             if name in self.classes: return f"Class<{name}>"
             f_def = self.global_functions.get(name)
             if f_def and f_def.return_type: return self.get_type_category(f_def.return_type)
@@ -723,6 +747,11 @@ class StaticAnalyzer:
                 if expr.method.value == "combine": return "String"
                 if expr.method.value == "len": return "Int"
                 if expr.method.value == "has": return "Bool"
+            elif base_type == "time":
+                if expr.method.value in ("sleep", "wait", "timer_start", "timer_pause", "timer_stop"):
+                    return "Void"
+                if expr.method.value == "timer_read":
+                    return "Float"
             elif base_type.startswith("Class<"):
                 c_name = base_type[6:-1]
                 if c_name in self.classes and expr.method.value in self.classes[c_name].methods:
@@ -908,7 +937,9 @@ class StaticAnalyzer:
         if isinstance(expr, Identifier):
             meta = self.get_var(expr.token.value)
             if not meta:
-                # Check if it's a builtin
+                # Check if it's a builtin module (time, random, thread)
+                if expr.token.value in ("time", "random", "thread"):
+                    return  # Module identifier, valid
                 if expr.token.value not in self.builtins and expr.token.value not in self.global_functions and expr.token.value not in self.classes:
                     self.report_error("E002", f"Cannot find `{expr.token.value}` in scope", expr.token.line)
             else:
@@ -922,6 +953,7 @@ class StaticAnalyzer:
             if meta and meta.type_cat.startswith(("List<", "Dict<", "Index<")):
                 if len(expr.args) > 0 and isinstance(expr.args[0], Literal) and expr.args[0].value == 0:
                     self.report_error("E051", f"Attempted to access index 0. Collections are 1-indexed.", expr.line)
+                for arg in expr.args: self.check_expr(arg, current_line)
                 meta.is_read = True
             elif target_name not in self.global_functions and target_name not in self.builtins and target_name not in self.classes:
                 self.report_error("E003", f"Cannot find function or class `{target_name}`", expr.line)
@@ -935,7 +967,7 @@ class StaticAnalyzer:
                             a_type, e_type = self.infer_type(arg), self.get_type_category(f_def.params[i][1])
                             if a_type != "Unknown" and e_type != "Unknown" and a_type != e_type:
                                 self.report_error("E071", f"Argument {i+1} for `{target_name}` should be `{e_type}`, found `{a_type}`.", expr.line)
-            for arg in expr.args: self.check_expr(arg, current_line)
+                for arg in expr.args: self.check_expr(arg, current_line)
 
         elif isinstance(expr, MethodCall):
             b_type = self.infer_type(expr.obj)
@@ -945,6 +977,8 @@ class StaticAnalyzer:
             if expr.method.value != "drop":
                 if b_type == "String" and expr.method.value not in ("len", "has", "to", "combine"):
                     self.report_error("E090", f"Method `{expr.method.value}` not found on String", expr.line)
+                elif b_type == "time" and expr.method.value not in ("sleep", "wait", "timer_start", "timer_pause", "timer_stop", "timer_read"):
+                    self.report_error("E090", f"Method `{expr.method.value}` not found on time module", expr.line)
                 elif b_type.startswith("Class<"):
                     c_name = b_type[6:-1]
                     if c_name in self.classes:
