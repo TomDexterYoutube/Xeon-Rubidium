@@ -76,5 +76,5 @@ xeon run
 
 ## PLEASE 
 
-I dont want any money you can support this project by reporting bugs or giving sugestions!
-Post stuff in the issues section
+I don't want any money you can support this project by reporting bugs or giving sugestions!
+Post stuff in the issues section.
