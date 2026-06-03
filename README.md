@@ -6,6 +6,8 @@ Markdown
 
 Xeon streamlines the process of initializing, building, and running your Rubidium applications. It acts as your primary toolchain, working seamlessly across Windows, Linux, and macOS, and natively handling project roots just like Cargo.
 
+'Note: The Rubidium source code can be found [here](https://github.com/TomDexterYoutube/Rubidium)'
+
 ---
 
 ## Installation Setup
