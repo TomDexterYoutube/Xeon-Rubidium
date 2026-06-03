@@ -1,5 +1,3 @@
-Markdown
-
 # Xeon-Rubidium
 
 **The official project and build manager for the Rubidium programming language.**
