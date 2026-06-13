@@ -45,6 +45,30 @@ def build_project():
     
     os.makedirs("build", exist_ok=True)
     
+    for fname in os.listdir("build"):
+        fpath = os.path.join("build", fname)
+        if os.path.isfile(fpath) or os.path.islink(fpath):
+            os.remove(fpath)
+        elif os.path.isdir(fpath):
+            import shutil
+            shutil.rmtree(fpath)
+    
+    bundled = 0
+    if os.path.isdir("src"):
+        for root, _dirs, files in os.walk("src"):
+            for fname in files:
+                if fname.endswith((".so", ".dll", ".dylib")):
+                    src = os.path.join(root, fname)
+                    rel = os.path.relpath(src, "src")
+                    dst = os.path.join("build", rel)
+                    os.makedirs(os.path.dirname(dst), exist_ok=True)
+                    import shutil
+                    shutil.copy2(src, dst)
+                    print(f"  bundled FFI lib → build/{rel}")
+                    bundled += 1
+    if bundled:
+        print(f"  {bundled} FFI library file(s) bundled")
+    
     # The executable name defaults to the name of the project folder
     project_name = Path(os.getcwd()).name
     out_name = f"build/{project_name}"
