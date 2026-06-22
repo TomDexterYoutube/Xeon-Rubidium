@@ -11,7 +11,7 @@ Xeon streamlines the process of initializing, building, and running your Rubidiu
 ## Installation Setup
 
 1. **Execute the Installer:** Run the appropriate installation script for your operating system to install Xeon globally. **The script will automatically detect and install required dependencies like Python 3 and Clang.**
-   * **Windows:** Run `install.bat`
+   * **Windows:** Run `install.ps1`
    * **Linux / macOS:** Run `bash install.sh`
 2. **Lol** There is no step 2 its just that easy.
 
