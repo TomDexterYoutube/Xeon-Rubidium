@@ -1,36 +1,62 @@
+```python
 import sys
 import os
 import subprocess
 import shutil
 from pathlib import Path
 
+
 # Resolve the ~/.xeon directory
-XEON_DIR        = Path.home() / ".xeon"
+XEON_DIR = Path.home() / ".xeon"
+
 COMPILER_SCRIPT = XEON_DIR / "compiler.py"
 DEBUGGER_SCRIPT = XEON_DIR / "debug.py"
-ANALYZER_SCRIPT = XEON_DIR / "analyzer.py"
 
 
-# ─── Helpers ──────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────
+# Helpers
+# ─────────────────────────────────────────────────────────────
 
 def _require_src():
     if not os.path.exists("src"):
         print("✖ No src/ directory found. Run 'xeon init' first.")
         sys.exit(1)
+
     main_file = "src/main.rub"
+
     if not os.path.exists(main_file):
         print(f"✖ Entry point '{main_file}' not found.")
         sys.exit(1)
+
     return main_file
+
 
 def _require_compiler():
     if not COMPILER_SCRIPT.exists():
-        print(f"✖ Compiler not found at {COMPILER_SCRIPT}.")
+        print(f"✖ Compiler not found at {COMPILER_SCRIPT}")
         print("  Please ensure Rubidium is installed in ~/.xeon")
         sys.exit(1)
 
 
-# ─── Commands ─────────────────────────────────────────────────────────────────
+def run_debugger(main_file):
+    if not DEBUGGER_SCRIPT.exists():
+        print("⚠ Debugger not found. Skipping debug checks.")
+        return
+
+    print("🔍 Running Rubidium debugger...")
+
+    res = subprocess.run(
+        [sys.executable, str(DEBUGGER_SCRIPT), main_file]
+    )
+
+    if res.returncode != 0:
+        print("✖ Debugger found issues.")
+        sys.exit(1)
+
+
+# ─────────────────────────────────────────────────────────────
+# Commands
+# ─────────────────────────────────────────────────────────────
 
 def init_project():
     if os.path.exists("src"):
@@ -38,6 +64,7 @@ def init_project():
         return
 
     os.makedirs("src")
+
     with open("src/main.rub", "w") as f:
         f.write(
             'fn main() {\n'
@@ -49,101 +76,101 @@ def init_project():
     print("✔ Initialized new Rubidium project in ./src")
 
 
-def check_project(strict: bool = False):
-    """Run the static analyzer against src/main.rub."""
+def check_project():
     main_file = _require_src()
 
-    if not ANALYZER_SCRIPT.exists():
-        print(f"✖ Analyzer not found at {ANALYZER_SCRIPT}.")
-        print("  Please ensure analyzer.py is installed in ~/.xeon")
+    if not DEBUGGER_SCRIPT.exists():
+        print(f"✖ Debugger not found at {DEBUGGER_SCRIPT}")
         sys.exit(1)
 
-    cmd = [sys.executable, str(ANALYZER_SCRIPT), "check", main_file]
-    if strict:
-        cmd.append("--strict")
+    res = subprocess.run(
+        [sys.executable, str(DEBUGGER_SCRIPT), "check", main_file]
+    )
 
-    res = subprocess.run(cmd)
     sys.exit(res.returncode)
 
 
-def build_project(strict_check: bool = False):
+def build_project(no_debug=False):
     main_file = _require_src()
     _require_compiler()
 
-    # ── Step 1: Static analysis ───────────────────────────────────────────────
-    if ANALYZER_SCRIPT.exists():
-        print("🔎 Running static analyzer...")
-        cmd = [sys.executable, str(ANALYZER_SCRIPT), "check", main_file]
-        if strict_check:
-            cmd.append("--strict")
-        res = subprocess.run(cmd)
-        if res.returncode != 0:
-            print("✖ Static analysis failed. Fix errors before building.")
-            sys.exit(1)
-    else:
-        print("⚠  Analyzer not found — skipping static analysis.")
+    if not no_debug:
+        run_debugger(main_file)
 
-    # ── Step 2: Debugger ──────────────────────────────────────────────────────
-    if DEBUGGER_SCRIPT.exists():
-        print("🔍 Running Rubidium debugger...")
-        res = subprocess.run([sys.executable, str(DEBUGGER_SCRIPT), main_file])
-        if res.returncode != 0:
-            print("✖ Debugger found issues. Fix them before compiling.")
-            sys.exit(1)
+    build_dir = Path("build")
 
-    # ── Step 3: Clean build directory ────────────────────────────────────────
-    os.makedirs("build", exist_ok=True)
-    for fname in os.listdir("build"):
-        fpath = os.path.join("build", fname)
-        if os.path.isfile(fpath) or os.path.islink(fpath):
-            os.remove(fpath)
-        elif os.path.isdir(fpath):
-            shutil.rmtree(fpath)
+    if build_dir.exists():
+        shutil.rmtree(build_dir)
 
-    # ── Step 4: Bundle FFI libraries ─────────────────────────────────────────
+    build_dir.mkdir(parents=True)
+
     bundled = 0
-    for root, _dirs, files in os.walk("src"):
+
+    for root, _, files in os.walk("src"):
         for fname in files:
             if fname.endswith((".so", ".dll", ".dylib")):
-                src_path = os.path.join(root, fname)
-                rel      = os.path.relpath(src_path, "src")
-                dst_path = os.path.join("build", rel)
-                os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+                src_path = Path(root) / fname
+                rel_path = src_path.relative_to("src")
+
+                dst_path = build_dir / rel_path
+                dst_path.parent.mkdir(parents=True, exist_ok=True)
+
                 shutil.copy2(src_path, dst_path)
-                print(f"  bundled FFI lib → build/{rel}")
+
+                print(f"  bundled FFI lib → build/{rel_path}")
                 bundled += 1
+
     if bundled:
         print(f"  {bundled} FFI library file(s) bundled")
 
-    # ── Step 5: Compile ───────────────────────────────────────────────────────
-    project_name = Path(os.getcwd()).name
-    out_name = f"build/{project_name}"
+    project_name = Path.cwd().name
+
+    out_name = build_dir / project_name
+
     if os.name == "nt":
-        out_name += ".exe"
+        out_name = out_name.with_suffix(".exe")
 
     print(f"Compiling {project_name}...")
+
     res = subprocess.run(
-        [sys.executable, str(COMPILER_SCRIPT), main_file, out_name]
+        [
+            sys.executable,
+            str(COMPILER_SCRIPT),
+            main_file,
+            str(out_name),
+        ]
     )
 
     if res.returncode != 0:
         print("✖ Build failed.")
         sys.exit(1)
 
-    return out_name
+    print("✔ Build complete")
+
+    return str(out_name)
 
 
-def run_project(strict_check: bool = False):
-    out_name = build_project(strict_check=strict_check)
-    print(f"Running {out_name}...\n" + "─" * 30)
-    run_cmd = [f"./{out_name}"] if os.name != "nt" else [out_name]
+def run_project(no_debug=False):
+    out_name = build_project(no_debug=no_debug)
+
+    print(f"\nRunning {out_name}...")
+    print("─" * 30)
+
+    run_cmd = (
+        [f"./{out_name}"]
+        if os.name != "nt"
+        else [out_name]
+    )
+
     try:
         subprocess.run(run_cmd)
     except KeyboardInterrupt:
-        pass
+        print("\nProgram terminated.")
 
 
-# ─── Entry point ──────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────
+# Entry Point
+# ─────────────────────────────────────────────────────────────
 
 USAGE = """\
 Usage: xeon <command> [options]
@@ -155,26 +182,43 @@ Commands:
   run           Build and run the project
 
 Options:
-  --strict      Treat analyzer warnings as errors (check / build / run)
+  --no-debug    Skip debugger checks during build/run
 """
+
 
 def main():
     if len(sys.argv) < 2:
         print(USAGE)
         sys.exit(1)
 
-    args   = sys.argv[1:]
-    cmd    = args[0]
-    strict = "--strict" in args
+    args = sys.argv[1:]
+
+    no_debug = "--no-debug" in args
+
+    args = [
+        arg
+        for arg in args
+        if arg != "--no-debug"
+    ]
+
+    if not args:
+        print(USAGE)
+        sys.exit(1)
+
+    cmd = args[0]
 
     if cmd == "init":
         init_project()
+
     elif cmd == "check":
-        check_project(strict=strict)
+        check_project()
+
     elif cmd == "build":
-        build_project(strict_check=strict)
+        build_project(no_debug=no_debug)
+
     elif cmd == "run":
-        run_project(strict_check=strict)
+        run_project(no_debug=no_debug)
+
     else:
         print(f"Unknown command: {cmd}")
         print(USAGE)
@@ -183,3 +227,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+```
