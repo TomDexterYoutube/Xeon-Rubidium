@@ -24,11 +24,6 @@ for cmd in python3 curl unzip; do
     fi
 done
 
-if ! python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 13) else 1)'; then
-    echo "[!] Python 3.13+ required. Please update your Python."
-    exit 1
-fi
-
 TMP_DIR=$(mktemp -d)
 cd "$TMP_DIR"
 
