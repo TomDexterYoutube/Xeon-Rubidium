@@ -64,6 +64,10 @@ if [ "$1" == "update" ]; then
     UPDATE_TMP=$(mktemp -d)
     cd "$UPDATE_TMP"
     
+    rm ~/.xeon/xeon.py
+    
+    curl -L -f -s "https://github.com/TomDexterYoutube/Xeon-Rubidium/main/xeon.py" -o ~/.xeon/xeon.py
+    
     if curl -L -f -s "https://github.com/TomDexterYoutube/Rubidium/archive/refs/heads/main.zip" -o rubidium.zip; then
         unzip -q -o rubidium.zip
         rm -rf Rubidium
