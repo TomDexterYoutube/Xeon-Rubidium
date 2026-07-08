@@ -28,6 +28,7 @@ PKG_API_BASE = f"https://api.github.com/repos/{PKG_REPO_OWNER}/{PKG_REPO_NAME}/c
 PKG_LIST_PATH  = XEON_DIR / "pkg-list"
 PACKAGES_DIR   = XEON_DIR / "packages"
 PKG_LIST_STALE_SECONDS = 24 * 60 * 60  # re-fetch if local pkg-list is older than this
+TOKEN_PATH = XEON_DIR / "token"  # GitHub personal access token, set via 'xeon auth <token>'
 
 
 # ─────────────────────────────────────────────────────────────
@@ -200,8 +201,29 @@ def run_project(no_debug=False, shared=False):
 # Package manager (xeon pkg) — HTTP helpers
 # ─────────────────────────────────────────────────────────────
 
+def _load_token():
+    if TOKEN_PATH.exists():
+        tok = TOKEN_PATH.read_text().strip()
+        return tok or None
+    return None
+
+
+def _warn_if_no_token():
+    if _load_token() is None:
+        print("⚠ No GitHub token set (60 req/hour limit, shared per IP). "
+              "Run 'xeon auth <token>' to raise it to 5000/hour. "
+              "Run 'xeon pkg help' for details.")
+
+
 def _http_get_bytes(url):
-    req = urllib.request.Request(url, headers={"User-Agent": "xeon-pkg-manager"})
+    headers = {"User-Agent": "xeon-pkg-manager"}
+    token = _load_token()
+    # Only api.github.com is rate-limited by auth (60/hr vs 5000/hr).
+    # raw.githubusercontent.com doesn't check/benefit from this token, and
+    # sending it there can cause odd failures with a bad/expired token.
+    if token and url.startswith("https://api.github.com/"):
+        headers["Authorization"] = f"Bearer {token}"
+    req = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(req, timeout=15) as resp:
         return resp.read()
 
@@ -427,7 +449,56 @@ How it works:
       xeon <package_name> as <alias>
 
   Package repository: https://github.com/{owner}/{repo}
+
+  Note: unauthenticated requests are limited to 60/hour per IP. Run
+  'xeon auth <token>' to raise this to 5000/hour.
 """.format(owner=PKG_REPO_OWNER, repo=PKG_REPO_NAME)
+
+
+AUTH_HELP = """\
+Usage: xeon auth <token>      Set your GitHub token
+       xeon auth               Show current auth status
+       xeon auth clear         Remove the stored token
+
+A GitHub token raises the API rate limit used by 'xeon pkg' from
+60 requests/hour (shared per IP, unauthenticated) to 5000/hour.
+
+Create one at: https://github.com/settings/tokens
+(a classic token with 'public_repo' read access is enough — xeon-pkgs is public)
+"""
+
+
+def handle_auth(args):
+    if not args:
+        token = _load_token()
+        if token:
+            masked = token[:4] + "…" + token[-4:] if len(token) > 8 else "****"
+            print(f"✔ GitHub token is set ({masked})")
+        else:
+            print("No GitHub token set.")
+            print(AUTH_HELP)
+        return
+
+    if args[0] in ("help", "-h", "--help"):
+        print(AUTH_HELP)
+        return
+
+    if args[0] == "clear":
+        if TOKEN_PATH.exists():
+            TOKEN_PATH.unlink()
+            print("✔ Token removed")
+        else:
+            print("No token was set.")
+        return
+
+    token = args[0]
+    XEON_DIR.mkdir(parents=True, exist_ok=True)
+    TOKEN_PATH.write_text(token.strip())
+    try:
+        TOKEN_PATH.chmod(0o600)
+    except OSError:
+        pass
+    print("✔ GitHub token saved — 'xeon pkg' will now use it automatically")
 
 
 def handle_pkg(args):
@@ -441,12 +512,15 @@ def handle_pkg(args):
     if subcmd == "help":
         print(PKG_HELP)
     elif subcmd == "fetch":
+        _warn_if_no_token()
         pkg_fetch()
     elif subcmd == "pull":
+        _warn_if_no_token()
         pkg_pull(rest[0] if rest else None)
     elif subcmd == "purge":
         pkg_purge(rest[0] if rest else None)
     elif subcmd == "upgrade":
+        _warn_if_no_token()
         pkg_upgrade()
     else:
         print(f"Unknown pkg command: {subcmd}\n")
@@ -467,6 +541,8 @@ Commands:
   build         Analyze, debug-check, then compile
   run           Build and run the project
   pkg           Manage packages (run 'xeon pkg help' for details)
+  auth          Set a GitHub token to raise 'xeon pkg' rate limits
+                (run 'xeon auth' with no args for details)
 
 Options:
   --no-debug    Skip debugger checks during build/run
@@ -485,6 +561,10 @@ def main():
 
     if args[0] == "pkg":
         handle_pkg(args[1:])
+        return
+
+    if args[0] == "auth":
+        handle_auth(args[1:])
         return
 
     no_debug = "--no-debug" in args
