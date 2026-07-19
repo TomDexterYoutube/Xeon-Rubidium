@@ -25,6 +25,9 @@ PKG_REPO_BRANCH = "main"
 PKG_RAW_BASE = f"https://raw.githubusercontent.com/{PKG_REPO_OWNER}/{PKG_REPO_NAME}/{PKG_REPO_BRANCH}"
 PKG_API_BASE = f"https://api.github.com/repos/{PKG_REPO_OWNER}/{PKG_REPO_NAME}/contents"
 
+CORE_REPO_NAME  = "xeon"
+CORE_RAW_BASE   = f"https://raw.githubusercontent.com/{PKG_REPO_OWNER}/{CORE_REPO_NAME}/{PKG_REPO_BRANCH}"
+
 PKG_LIST_PATH  = XEON_DIR / "pkg-list"
 PACKAGES_DIR   = XEON_DIR / "packages"
 PKG_LIST_STALE_SECONDS = 24 * 60 * 60  # re-fetch if local pkg-list is older than this
@@ -197,6 +200,40 @@ def run_project(no_debug=False, shared=False):
         print("\nProgram terminated.")
 
 
+def xeon_update():
+    """Updates the Xeon core toolchain files and attempts to update the CLI script itself."""
+    print("🔄 Updating Xeon toolchain and CLI...")
+    XEON_DIR.mkdir(parents=True, exist_ok=True)
+
+    # 1. Update core backend scripts
+    for script_name, dest_path in [("compiler.py", COMPILER_SCRIPT), ("debug.py", DEBUGGER_SCRIPT)]:
+        url = f"{CORE_RAW_BASE}/{script_name}"
+        print(f"  Fetching latest {script_name}...")
+        try:
+            _http_download(url, dest_path)
+            print(f"  ✔ Updated {script_name}")
+        except (urllib.error.URLError, urllib.error.HTTPError) as e:
+            print(f"  ✖ Failed to update {script_name}: {e}")
+
+    # 2. Attempt to update the running CLI executable script itself
+    current_script = Path(sys.argv[0]).resolve()
+    script_url = f"{CORE_RAW_BASE}/xeon.py"
+    print("  Fetching latest xeon CLI script...")
+    try:
+        data = _http_get_bytes(script_url)
+        try:
+            current_script.write_bytes(data)
+            print("  ✔ Updated xeon CLI script itself!")
+        except OSError:
+            fallback_path = XEON_DIR / "xeon.py"
+            fallback_path.write_bytes(data)
+            print(f"  ⚠ Could not overwrite {current_script} directly. Latest CLI saved to {fallback_path}")
+    except (urllib.error.URLError, urllib.error.HTTPError) as e:
+        print(f"  ✖ Failed to fetch latest xeon CLI script: {e}")
+
+    print("✔ Xeon update execution finished.")
+
+
 # ─────────────────────────────────────────────────────────────
 # Package manager (xeon pkg) — HTTP helpers
 # ─────────────────────────────────────────────────────────────
@@ -218,9 +255,6 @@ def _warn_if_no_token():
 def _http_get_bytes(url):
     headers = {"User-Agent": "xeon-pkg-manager"}
     token = _load_token()
-    # Only api.github.com is rate-limited by auth (60/hr vs 5000/hr).
-    # raw.githubusercontent.com doesn't check/benefit from this token, and
-    # sending it there can cause odd failures with a bad/expired token.
     if token and url.startswith("https://api.github.com/"):
         headers["Authorization"] = f"Bearer {token}"
     req = urllib.request.Request(url, headers=headers)
@@ -321,9 +355,6 @@ def _ensure_pkg_list_fresh():
 
 
 def _download_package_files(pkg_name, dest_dir):
-    """Recursively download every file under <pkg_name>/ in the repo via the
-    GitHub Contents API (needed since raw.githubusercontent.com can't list a
-    directory, and packages may contain an unknown number of extra .rub files)."""
     def _walk(repo_path, local_dir):
         api_url = f"{PKG_API_BASE}/{repo_path}?ref={PKG_REPO_BRANCH}"
         entries = _http_get_json(api_url)
@@ -386,42 +417,80 @@ def pkg_purge(pkg_name):
     print(f"✔ Removed '{pkg_name}'")
 
 
-def pkg_upgrade():
+def pkg_upgrade(pkg_name=None):
     _ensure_pkg_list_fresh()
     remote_list = _load_local_pkg_list()
 
+    if pkg_name:
+        pkg_dir = PACKAGES_DIR / pkg_name
+        if not pkg_dir.exists():
+            print(f"✖ Package '{pkg_name}' is not installed.")
+            sys.exit(1)
+        targets = [pkg_dir]
+    else:
+        if not PACKAGES_DIR.exists() or not any(PACKAGES_DIR.iterdir()):
+            print("No packages installed.")
+            return
+        targets = sorted(PACKAGES_DIR.iterdir())
+
+    upgraded, unchanged, missing = 0, 0, 0
+
+    for pkg_dir in targets:
+        if not pkg_dir.is_dir():
+            continue
+        name = pkg_dir.name
+        ver_path = pkg_dir / "pkg.ver"
+        local_ver = ver_path.read_text().strip() if ver_path.exists() else None
+
+        if name not in remote_list:
+            print(f"  {name}: ⚠ not found in pkg-list (skipped)")
+            missing += 1
+            continue
+
+        remote_ver = remote_list[name]
+
+        if local_ver is None or _version_is_newer(remote_ver, local_ver):
+            print(f"  {name}: {local_ver or '?'} → {remote_ver} (upgrading)")
+            try:
+                _download_package_files(name, pkg_dir)
+                upgraded += 1
+            except (urllib.error.URLError, urllib.error.HTTPError) as e:
+                print(f"    ✖ Failed to upgrade '{name}': {e}")
+        else:
+            print(f"  {name}: {local_ver} (up to date)")
+            unchanged += 1
+
+    print(f"\n✔ Upgrade complete — {upgraded} upgraded, {unchanged} up to date, {missing} skipped")
+
+
+def pkg_list_all():
+    """Lists all packages available in the fetched registry index."""
+    _ensure_pkg_list_fresh()
+    remote_list = _load_local_pkg_list()
+    
+    if not remote_list:
+        print("No packages found in index. Try running 'xeon pkg fetch'.")
+        return
+
+    print("Available Packages (Registry Index):")
+    for name, version in sorted(remote_list.items()):
+        print(f"  {name} ({version})")
+
+
+def pkg_list_installed():
+    """Lists all locally installed packages inside ~/.xeon/packages/."""
     if not PACKAGES_DIR.exists() or not any(PACKAGES_DIR.iterdir()):
         print("No packages installed.")
         return
 
-    upgraded, unchanged, missing = 0, 0, 0
-
+    print("Installed Packages:")
     for pkg_dir in sorted(PACKAGES_DIR.iterdir()):
         if not pkg_dir.is_dir():
             continue
         pkg_name = pkg_dir.name
         ver_path = pkg_dir / "pkg.ver"
-        local_ver = ver_path.read_text().strip() if ver_path.exists() else None
-
-        if pkg_name not in remote_list:
-            print(f"  {pkg_name}: ⚠ not found in pkg-list (skipped)")
-            missing += 1
-            continue
-
-        remote_ver = remote_list[pkg_name]
-
-        if local_ver is None or _version_is_newer(remote_ver, local_ver):
-            print(f"  {pkg_name}: {local_ver or '?'} → {remote_ver} (upgrading)")
-            try:
-                _download_package_files(pkg_name, pkg_dir)
-                upgraded += 1
-            except (urllib.error.URLError, urllib.error.HTTPError) as e:
-                print(f"    ✖ Failed to upgrade '{pkg_name}': {e}")
-        else:
-            print(f"  {pkg_name}: {local_ver} (up to date)")
-            unchanged += 1
-
-    print(f"\n✔ Upgrade complete — {upgraded} upgraded, {unchanged} up to date, {missing} skipped")
+        local_ver = ver_path.read_text().strip() if ver_path.exists() else "unknown version"
+        print(f"  {pkg_name} ({local_ver})")
 
 
 PKG_HELP = """\
@@ -430,11 +499,13 @@ Rubidium Package Manager (xeon pkg)
 Commands:
   xeon pkg help              Show this help
   xeon pkg fetch              Download the latest package index (pkg-list)
+  xeon pkg list-all          List all packages available in the remote index
+  xeon pkg installed         List all currently installed packages
   xeon pkg pull <name>         Install a package (auto-fetches the index
                                 first if missing or older than 24h)
   xeon pkg purge <name>        Remove an installed package
-  xeon pkg upgrade             Upgrade every installed package to the
-                                latest version listed in pkg-list
+  xeon pkg upgrade [name]      Upgrade a specific package, or every installed
+                                package if no name is specified
 
 How it works:
   Packages are installed to ~/.xeon/packages/<name>/. Once installed, use
@@ -514,6 +585,10 @@ def handle_pkg(args):
     elif subcmd == "fetch":
         _warn_if_no_token()
         pkg_fetch()
+    elif subcmd == "list-all":
+        pkg_list_all()
+    elif subcmd == "installed":
+        pkg_list_installed()
     elif subcmd == "pull":
         _warn_if_no_token()
         pkg_pull(rest[0] if rest else None)
@@ -521,7 +596,7 @@ def handle_pkg(args):
         pkg_purge(rest[0] if rest else None)
     elif subcmd == "upgrade":
         _warn_if_no_token()
-        pkg_upgrade()
+        pkg_upgrade(rest[0] if rest else None)
     else:
         print(f"Unknown pkg command: {subcmd}\n")
         print(PKG_HELP)
@@ -540,6 +615,7 @@ Commands:
   check         Run the static analyzer only
   build         Analyze, debug-check, then compile
   run           Build and run the project
+  update        Update the Xeon core components and CLI execution script
   pkg           Manage packages (run 'xeon pkg help' for details)
   auth          Set a GitHub token to raise 'xeon pkg' rate limits
                 (run 'xeon auth' with no args for details)
@@ -593,6 +669,9 @@ def main():
 
     elif cmd == "run":
         run_project(no_debug=no_debug, shared=shared)
+
+    elif cmd == "update":
+        xeon_update()
 
     else:
         print(f"Unknown command: {cmd}")
