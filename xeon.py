@@ -64,11 +64,41 @@ def run_debugger(main_file):
         print("⚠ Debugger not found. Skipping debug checks.")
         return
 
-    print("🔍 Running Rubidium debugger...")
+    # BUG: debug.py doesn't just analyze — it actually INTERPRETS the
+    # program (every print() in the source runs for real, and for a game
+    # that means it opens windows / runs full frames / reads input) before
+    # the compiler even starts. With no visual boundary around that block,
+    # its output was indistinguishable from the real compiled run that
+    # follows later — for a game especially, seeing gameplay text scroll by
+    # with no indication it isn't the real run is actively misleading.
+    # Bracket it clearly so it's obvious where the debugger's own simulated
+    # execution starts and ends.
+    banner = "═" * 60
+    print(f"\n{banner}")
+    print("🔍 DEBUGGER — this executes your program's code once to check")
+    print("   for errors; anything it prints below is from THAT run, not")
+    print("   from the real compiled program.")
+    print(banner)
+    # BUG (compounds the one above): subprocess.run() lets the child write
+    # DIRECTLY to the inherited stdout fd, bypassing Python's own buffering
+    # for this process entirely. When xeon's stdout isn't a terminal (piped,
+    # redirected to a file, or — how this was actually found — captured by
+    # any wrapper/CI), our print() calls above sit in a buffer while the
+    # child's output goes straight through, so the banner meant to appear
+    # BEFORE the debugger's output showed up AFTER it instead. Flushing
+    # before handing off (and after getting control back) makes the
+    # boundary correct regardless of what stdout is connected to.
+    sys.stdout.flush()
 
     res = subprocess.run(
         [sys.executable, str(DEBUGGER_SCRIPT), main_file]
     )
+
+    sys.stdout.flush()
+    print(banner)
+    print("🔍 END DEBUGGER OUTPUT")
+    print(f"{banner}\n")
+    sys.stdout.flush()
 
     if res.returncode != 0:
         print("✖ Debugger found issues.")
@@ -160,6 +190,9 @@ def build_project(no_debug=False, shared=False):
 
     kind = "shared library" if shared else "executable"
     print(f"Compiling {project_name} ({kind})...")
+    sys.stdout.flush()   # see the flush() note in run_debugger() — same bug,
+                          # same fix: without this, "Compiling..." could show
+                          # up AFTER the compiler subprocess's own output.
 
     cmd = [sys.executable, str(COMPILER_SCRIPT)]
     if shared:
@@ -185,8 +218,11 @@ def run_project(no_debug=False, shared=False):
 
     out_name = build_project(no_debug=no_debug)
 
-    print(f"\nRunning {out_name}...")
-    print("─" * 30)
+    banner = "═" * 60
+    print(f"\n{banner}")
+    print(f"▶ RUNNING {out_name} — this is the real compiled program.")
+    print(banner)
+    sys.stdout.flush()   # see the matching flush() note in run_debugger()
 
     run_cmd = (
         [f"./{out_name}"]
@@ -198,6 +234,9 @@ def run_project(no_debug=False, shared=False):
         subprocess.run(run_cmd)
     except KeyboardInterrupt:
         print("\nProgram terminated.")
+    finally:
+        sys.stdout.flush()
+        print(banner)
 
 
 def xeon_update():
@@ -358,15 +397,42 @@ def _download_package_files(pkg_name, dest_dir):
     def _walk(repo_path, local_dir):
         api_url = f"{PKG_API_BASE}/{repo_path}?ref={PKG_REPO_BRANCH}"
         entries = _http_get_json(api_url)
+        # BUG: the GitHub contents API returns a JSON OBJECT, not a list, on
+        # every error response (rate limit exceeded, path not found, etc) —
+        # e.g. {"message": "API rate limit exceeded ..."}. This iterated it
+        # unconditionally as if it were always the list of directory
+        # entries; iterating a dict yields its string KEYS, so entry["type"]
+        # then raised "TypeError: string indices must be integers" — a
+        # confusing crash with a Python traceback instead of the real,
+        # actionable error (rate limit, wrong package name, etc).
+        if isinstance(entries, dict):
+            msg = entries.get("message", "unexpected response from GitHub API")
+            raise RuntimeError(f"GitHub API error for '{repo_path}': {msg}")
         for entry in entries:
             if entry["type"] == "file":
                 _http_download(entry["download_url"], local_dir / entry["name"])
             elif entry["type"] == "dir":
                 _walk(f"{repo_path}/{entry['name']}", local_dir / entry["name"])
 
+    # BUG: this used to rmtree(dest_dir) BEFORE downloading the replacement —
+    # so a rate limit or dropped connection partway through 'xeon pkg
+    # upgrade' deleted the currently-installed, working package and then
+    # failed, leaving NOTHING installed (not even the old version). Download
+    # into a fresh temp directory first, and only swap it into place once
+    # every file has downloaded successfully; a failure now leaves the
+    # existing install untouched.
+    tmp_dir = dest_dir.parent / f".{dest_dir.name}.tmp-{os.getpid()}"
+    if tmp_dir.exists():
+        shutil.rmtree(tmp_dir)
+    try:
+        _walk(pkg_name, tmp_dir)
+    except BaseException:
+        if tmp_dir.exists():
+            shutil.rmtree(tmp_dir)
+        raise
     if dest_dir.exists():
         shutil.rmtree(dest_dir)
-    _walk(pkg_name, dest_dir)
+    tmp_dir.rename(dest_dir)
 
 
 def pkg_pull(pkg_name):
@@ -386,7 +452,7 @@ def pkg_pull(pkg_name):
     dest_dir = PACKAGES_DIR / pkg_name
     try:
         _download_package_files(pkg_name, dest_dir)
-    except (urllib.error.URLError, urllib.error.HTTPError) as e:
+    except (urllib.error.URLError, urllib.error.HTTPError, RuntimeError) as e:
         print(f"✖ Failed to download package '{pkg_name}': {e}")
         sys.exit(1)
 
@@ -454,7 +520,7 @@ def pkg_upgrade(pkg_name=None):
             try:
                 _download_package_files(name, pkg_dir)
                 upgraded += 1
-            except (urllib.error.URLError, urllib.error.HTTPError) as e:
+            except (urllib.error.URLError, urllib.error.HTTPError, RuntimeError) as e:
                 print(f"    ✖ Failed to upgrade '{name}': {e}")
         else:
             print(f"  {name}: {local_ver} (up to date)")
