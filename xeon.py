@@ -134,8 +134,13 @@ def check_project():
         print(f"✖ Debugger not found at {DEBUGGER_SCRIPT}")
         sys.exit(1)
 
+    # BUGFIX (RIG brain project): debug.py's argparse only accepts a single
+    # positional <file.rub> (+ --strict) — there's no "check" subcommand on
+    # that side. Passing "check" here as an extra positional made every
+    # `xeon check` fail outright with "unrecognized arguments", regardless
+    # of the project being checked.
     res = subprocess.run(
-        [sys.executable, str(DEBUGGER_SCRIPT), "check", main_file]
+        [sys.executable, str(DEBUGGER_SCRIPT), main_file]
     )
 
     sys.exit(res.returncode)
