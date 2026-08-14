@@ -146,7 +146,7 @@ def check_project():
     sys.exit(res.returncode)
 
 
-def build_project(no_debug=False, shared=False):
+def build_project(no_debug=False, shared=False, native=None):
     main_file = _require_src()
     _require_compiler()
 
@@ -202,6 +202,8 @@ def build_project(no_debug=False, shared=False):
     cmd = [sys.executable, str(COMPILER_SCRIPT)]
     if shared:
         cmd.append("-s")
+    if native:
+        cmd += ["--native", native]
     cmd += [main_file, str(out_name)]
 
     res = subprocess.run(cmd)
@@ -215,13 +217,13 @@ def build_project(no_debug=False, shared=False):
     return str(out_name)
 
 
-def run_project(no_debug=False, shared=False):
+def run_project(no_debug=False, shared=False, native=None):
     if shared:
         print("✖ 'run' doesn't apply to a shared library build (-s) — there's no entry point to execute.")
         print("  Use 'xeon build -s' and load the resulting library via FFI instead.")
         sys.exit(1)
 
-    out_name = build_project(no_debug=no_debug)
+    out_name = build_project(no_debug=no_debug, native=native)
 
     banner = "═" * 60
     print(f"\n{banner}")
@@ -696,7 +698,17 @@ Options:
   -s            Compile as a shared library (.so/.dll/.dylib) with no
                 entry point — exported fn's are callable via FFI from
                 another language. Only valid with 'build' (not 'run').
+  --native <mode>
+                current   Tune for this exact machine's CPU (-march=native).
+                          Fastest, but won't run on other machines.
+                amd64     Generic 64-bit x86 (Intel or AMD) — no per-CPU
+                          tuning, just works on any machine of that family.
+                amd32     Generic 32-bit x86 (Intel or AMD), same idea.
+                arm64     Generic 64-bit ARM (aarch64).
+                arm32     Generic 32-bit ARM (armhf).
 """
+
+NATIVE_CHOICES = ("current", "amd64", "amd32", "arm32", "arm64")
 
 
 def main():
@@ -717,6 +729,15 @@ def main():
     no_debug = "--no-debug" in args
     shared   = "-s" in args
 
+    native = None
+    if "--native" in args:
+        idx = args.index("--native")
+        if idx + 1 >= len(args) or args[idx + 1] not in NATIVE_CHOICES:
+            print(f"✖ --native requires one of: {', '.join(NATIVE_CHOICES)}")
+            sys.exit(1)
+        native = args[idx + 1]
+        del args[idx:idx + 2]
+
     args = [
         arg
         for arg in args
@@ -736,10 +757,10 @@ def main():
         check_project()
 
     elif cmd == "build":
-        build_project(no_debug=no_debug, shared=shared)
+        build_project(no_debug=no_debug, shared=shared, native=native)
 
     elif cmd == "run":
-        run_project(no_debug=no_debug, shared=shared)
+        run_project(no_debug=no_debug, shared=shared, native=native)
 
     elif cmd == "update":
         xeon_update()
