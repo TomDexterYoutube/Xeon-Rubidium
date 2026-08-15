@@ -9,11 +9,14 @@ if ($isAdmin) {
 
 # Define Paths
 $XEON_DIR = Join-Path $HOME ".xeon"
+$VIRE_DIR = Join-Path $XEON_DIR "vire"
 $BIN_DIR = Join-Path $HOME ".local\bin"
 $REPO_URL = "https://github.com/TomDexterYoutube/Rubidium/archive/refs/heads/main.zip"
+$VIRE_REPO_URL = "https://github.com/TomDexterYoutube/Rubidium-Vire/archive/refs/heads/main.zip"
 
 # Create directories if they don't exist
 New-Item -ItemType Directory -Force -Path $XEON_DIR | Out-Null
+New-Item -ItemType Directory -Force -Path $VIRE_DIR | Out-Null
 New-Item -ItemType Directory -Force -Path $BIN_DIR | Out-Null
 
 # Copy local xeon.py to the setup folder
@@ -23,7 +26,7 @@ if (Test-Path "xeon.py") {
     Write-Host "[!] xeon.py not found in current directory. Proceeding anyway..." -ForegroundColor Yellow
 }
 
-Write-Host "[1/5] Checking system..."
+Write-Host "[1/6] Checking system..."
 # Check for Python
 if (-not (Get-Command "python" -ErrorAction SilentlyContinue)) {
     Write-Host "[!] Python is not installed or not in your PATH." -ForegroundColor Red
@@ -41,7 +44,7 @@ if ([version]$pyVersion -lt [version]"3.13") {
 $TMP_DIR = Join-Path [System.IO.Path]::GetTempPath() ([System.IO.Path]::GetRandomFileName())
 New-Item -ItemType Directory -Path $TMP_DIR | Out-Null
 
-Write-Host "[2/5] Fetching source..."
+Write-Host "[2/6] Fetching Rubidium source..."
 $zipPath = Join-Path $TMP_DIR "rubidium.zip"
 try {
     Invoke-WebRequest -Uri $REPO_URL -OutFile $zipPath -UseBasicParsing
@@ -51,30 +54,51 @@ try {
     Exit
 }
 
-Write-Host "[3/5] Extracting..."
+Write-Host "[3/6] Extracting Rubidium..."
 Expand-Archive -Path $zipPath -DestinationPath $TMP_DIR -Force
 
-# Locate the extracted folder (handling variable naming)
-$extractedFolder = Get-ChildItem -Path $TMP_DIR -Directory | Where-Object { $_.Name -like "*Rubidium*" } | Select-Object -First 1
+# Locate the extracted folder (handling variable naming). Excludes any
+# *Vire* match so this can't accidentally pick up a Rubidium-Vire-main
+# folder if one is ever extracted into the same temp dir.
+$extractedFolder = Get-ChildItem -Path $TMP_DIR -Directory | Where-Object { $_.Name -like "*Rubidium*" -and $_.Name -notlike "*Vire*" } | Select-Object -First 1
 
-Write-Host "[4/5] Copying files..."
+Write-Host "[4/6] Copying Rubidium files..."
 if ($extractedFolder) {
     # Copy all files inside the extracted folder to .xeon
     Copy-Item -Path "$($extractedFolder.FullName)\*" -Destination $XEON_DIR -Recurse -Force
 }
 
+# Vire — the FFI compatibility layer's own toolchain (compiler.py/debug.py/
+# lexer.py/parser.py/rub_ast.py/codegen.py). It lives in its own vire\
+# subfolder rather than flattened into $XEON_DIR alongside Rubidium's
+# identically-named files, which it would otherwise collide with.
+Write-Host "[5/6] Fetching and extracting Vire..."
+$vireZipPath = Join-Path $TMP_DIR "vire.zip"
+try {
+    Invoke-WebRequest -Uri $VIRE_REPO_URL -OutFile $vireZipPath -UseBasicParsing
+    Expand-Archive -Path $vireZipPath -DestinationPath $TMP_DIR -Force
+    $vireExtractedFolder = Get-ChildItem -Path $TMP_DIR -Directory | Where-Object { $_.Name -like "*Vire*" } | Select-Object -First 1
+    if ($vireExtractedFolder) {
+        Copy-Item -Path "$($vireExtractedFolder.FullName)\*" -Destination $VIRE_DIR -Recurse -Force
+    }
+} catch {
+    Write-Host "[!] Failed to download Vire — continuing without it (FFI wrapper builds won't work until 'xeon update' succeeds)." -ForegroundColor Yellow
+}
+
 # Clean up temp folder
 Remove-Item -Recurse -Force $TMP_DIR
 
-Write-Host "[5/5] Creating wrapper script..."
+Write-Host "[6/6] Creating wrapper script..."
 # Windows uses .cmd or .ps1 files for command wrappers in PATH. We'll create a cmd batch file.
 $wrapperPath = Join-Path $BIN_DIR "xeon.cmd"
 $wrapperContent = @"
 @echo off
 if "%~1"=="update" (
     echo Updating Rubidium...
-    powershell -Command "Invoke-WebRequest -Uri 'https://github.com/TomDexterYoutube/Xeon-Rubidium/main/xeon.py' -OutFile '$XEON_DIR\xeon.py' -UseBasicParsing"
-    powershell -Command "`$tmp = Join-Path [System.IO.Path]::GetTempPath() ([System.IO.Path]::GetRandomFileName()); Invoke-WebRequest -Uri '$REPO_URL' -OutFile (Join-Path `$tmp 'rubidium.zip') -UseBasicParsing; Expand-Archive -Path (Join-Path `$tmp 'rubidium.zip') -DestinationPath `$tmp -Force; `$ext = Get-ChildItem `$tmp -Directory | Where-Object { `$_.Name -like '*Rubidium*' } | Select-Object -First 1; Copy-Item -Path '`$(`$ext.FullName)\*' -Destination '$XEON_DIR' -Recurse -Force; Remove-Item -Recurse -Force `$tmp"
+    powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/TomDexterYoutube/Xeon-Rubidium/main/xeon.py' -OutFile '$XEON_DIR\xeon.py' -UseBasicParsing"
+    powershell -Command "`$tmp = Join-Path ([System.IO.Path]::GetTempPath()) ([System.IO.Path]::GetRandomFileName()); New-Item -ItemType Directory -Path `$tmp | Out-Null; Invoke-WebRequest -Uri '$REPO_URL' -OutFile (Join-Path `$tmp 'rubidium.zip') -UseBasicParsing; Expand-Archive -Path (Join-Path `$tmp 'rubidium.zip') -DestinationPath `$tmp -Force; `$ext = Get-ChildItem `$tmp -Directory | Where-Object { `$_.Name -like '*Rubidium*' -and `$_.Name -notlike '*Vire*' } | Select-Object -First 1; if (`$ext) { Copy-Item -Path (Join-Path `$ext.FullName '*') -Destination '$XEON_DIR' -Recurse -Force }; Remove-Item -Recurse -Force `$tmp"
+    echo Updating Vire...
+    powershell -Command "New-Item -ItemType Directory -Force -Path '$VIRE_DIR' | Out-Null; `$tmp = Join-Path ([System.IO.Path]::GetTempPath()) ([System.IO.Path]::GetRandomFileName()); New-Item -ItemType Directory -Path `$tmp | Out-Null; try { Invoke-WebRequest -Uri '$VIRE_REPO_URL' -OutFile (Join-Path `$tmp 'vire.zip') -UseBasicParsing; Expand-Archive -Path (Join-Path `$tmp 'vire.zip') -DestinationPath `$tmp -Force; `$vext = Get-ChildItem `$tmp -Directory | Where-Object { `$_.Name -like '*Vire*' } | Select-Object -First 1; if (`$vext) { Copy-Item -Path (Join-Path `$vext.FullName '*') -Destination '$VIRE_DIR' -Recurse -Force } } catch { Write-Host '[!] Failed to update Vire' }; Remove-Item -Recurse -Force `$tmp"
     echo Update complete!
     goto :eof
 )

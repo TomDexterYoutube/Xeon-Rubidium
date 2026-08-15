@@ -10,16 +10,18 @@ fi
 cd "$(dirname "$0")"
 
 XEON_DIR="$HOME/.xeon"
+VIRE_DIR="$XEON_DIR/vire"
 BIN_DIR="$HOME/.local/bin"
 
 XEON_URL="https://raw.githubusercontent.com/TomDexterYoutube/Xeon-Rubidium/main/xeon.py"
 REPO_URL="https://github.com/TomDexterYoutube/Rubidium/archive/refs/heads/main.zip"
+VIRE_REPO_URL="https://github.com/TomDexterYoutube/Rubidium-Vire/archive/refs/heads/main.zip"
 
 
-mkdir -p "$XEON_DIR" "$BIN_DIR"
+mkdir -p "$XEON_DIR" "$VIRE_DIR" "$BIN_DIR"
 
 
-echo "[1/5] Checking system..."
+echo "[1/6] Checking system..."
 
 for cmd in python3 curl unzip; do
     if ! command -v "$cmd" &> /dev/null; then
@@ -29,7 +31,7 @@ for cmd in python3 curl unzip; do
 done
 
 
-echo "[2/5] Installing xeon.py..."
+echo "[2/6] Installing xeon.py..."
 
 cp xeon.py "$XEON_DIR/xeon.py"
 
@@ -38,7 +40,7 @@ TMP_DIR=$(mktemp -d)
 cd "$TMP_DIR"
 
 
-echo "[3/5] Downloading Rubidium source..."
+echo "[3/6] Downloading Rubidium source..."
 
 if ! curl -L -f -s "$REPO_URL" -o rubidium.zip; then
     echo "[!] Download failed."
@@ -47,30 +49,49 @@ if ! curl -L -f -s "$REPO_URL" -o rubidium.zip; then
 fi
 
 
-echo "[4/5] Extracting files..."
+echo "[4/6] Extracting Rubidium..."
 
 unzip -q -o rubidium.zip
-
 
 rm -rf Rubidium
 
 for dir in *Rubidium*; do
-    if [ -d "$dir" ]; then
+    if [ -d "$dir" ] && [[ "$dir" != *Vire* ]]; then
         mv "$dir" Rubidium
     fi
 done
 
-
-echo "[5/5] Copying files..."
-
 cp -rf Rubidium/. "$XEON_DIR/"
+
+
+# Vire — the FFI compatibility layer's own toolchain (compiler.py/debug.py/
+# lexer.py/parser.py/rub_ast.py/codegen.py). It lives in its own vire/
+# subfolder rather than flattened into $XEON_DIR alongside Rubidium's
+# identically-named files, which it would otherwise collide with.
+echo "[5/6] Downloading and extracting Vire..."
+
+if curl -L -f -s "$VIRE_REPO_URL" -o vire.zip; then
+    unzip -q -o vire.zip
+
+    rm -rf Vire
+
+    for dir in *Vire*; do
+        if [ -d "$dir" ]; then
+            mv "$dir" Vire
+        fi
+    done
+
+    cp -rf Vire/. "$VIRE_DIR/"
+else
+    echo "[!] Failed to download Vire — continuing without it (FFI wrapper builds won't work until 'xeon update' succeeds)."
+fi
 
 
 cd "$HOME"
 rm -rf "$TMP_DIR"
 
 
-echo "Creating xeon command..."
+echo "[6/6] Creating xeon command..."
 
 
 cat << 'EOF' > "$BIN_DIR/xeon"
@@ -78,9 +99,11 @@ cat << 'EOF' > "$BIN_DIR/xeon"
 set -e
 
 XEON_DIR="$HOME/.xeon"
+VIRE_DIR="$XEON_DIR/vire"
 
 XEON_URL="https://raw.githubusercontent.com/TomDexterYoutube/Xeon-Rubidium/main/xeon.py"
 REPO_URL="https://github.com/TomDexterYoutube/Rubidium/archive/refs/heads/main.zip"
+VIRE_REPO_URL="https://github.com/TomDexterYoutube/Rubidium-Vire/archive/refs/heads/main.zip"
 
 
 if [ "$1" == "update" ]; then
@@ -112,7 +135,7 @@ if [ "$1" == "update" ]; then
         rm -rf Rubidium
 
         for dir in *Rubidium*; do
-            if [ -d "$dir" ]; then
+            if [ -d "$dir" ] && [[ "$dir" != *Vire* ]]; then
                 mv "$dir" Rubidium
             fi
         done
@@ -121,11 +144,41 @@ if [ "$1" == "update" ]; then
         cp -rf Rubidium/. "$XEON_DIR/"
 
 
-        echo "Update complete!"
+        echo "Rubidium update complete!"
 
     else
 
         echo "[!] Failed to download Rubidium."
+
+    fi
+
+
+    echo "Updating Vire..."
+
+    mkdir -p "$VIRE_DIR"
+
+    if curl -L -f -s "$VIRE_REPO_URL" -o vire.zip; then
+
+        unzip -q -o vire.zip
+
+
+        rm -rf Vire
+
+        for dir in *Vire*; do
+            if [ -d "$dir" ]; then
+                mv "$dir" Vire
+            fi
+        done
+
+
+        cp -rf Vire/. "$VIRE_DIR/"
+
+
+        echo "Vire update complete!"
+
+    else
+
+        echo "[!] Failed to download Vire."
 
     fi
 

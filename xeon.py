@@ -15,6 +15,17 @@ XEON_DIR = Path.home() / ".xeon"
 COMPILER_SCRIPT = XEON_DIR / "compiler.py"
 DEBUGGER_SCRIPT = XEON_DIR / "debug.py"
 
+# Vire — the FFI compatibility layer. A .vire file always compiles to a
+# shared library (it has no entry point of its own). Vire's toolchain is
+# the same shape as Rubidium's own (compiler.py + debug.py, each importing
+# lexer.py/parser.py/rub_ast.py/codegen.py from their own directory) — it
+# lives in its own ~/.xeon/vire/ subfolder rather than dumped directly into
+# ~/.xeon/, since its lexer.py/parser.py/rub_ast.py/codegen.py would
+# otherwise collide with Rubidium's identically-named ones sitting there.
+VIRE_DIR = XEON_DIR / "vire"
+VIRE_COMPILER_SCRIPT = VIRE_DIR / "compiler.py"
+VIRE_DEBUGGER_SCRIPT = VIRE_DIR / "debug.py"
+
 # ─────────────────────────────────────────────────────────────
 # Package manager (xeon pkg) config
 # ─────────────────────────────────────────────────────────────
@@ -25,8 +36,35 @@ PKG_REPO_BRANCH = "main"
 PKG_RAW_BASE = f"https://raw.githubusercontent.com/{PKG_REPO_OWNER}/{PKG_REPO_NAME}/{PKG_REPO_BRANCH}"
 PKG_API_BASE = f"https://api.github.com/repos/{PKG_REPO_OWNER}/{PKG_REPO_NAME}/contents"
 
-CORE_REPO_NAME  = "xeon"
+# BUGFIX: this used to be "xeon", a repo that doesn't exist (confirmed via
+# the GitHub API — 404) — every 'python3 xeon.py update' silently failed to
+# update anything from it. In normal usage this whole function is actually
+# unreachable (install.sh's generated ~/.local/bin/xeon wrapper intercepts
+# "update" itself, in bash, before ever calling into xeon.py — see that
+# script), but it's still the real behavior for anyone invoking
+# `python3 xeon.py update` directly, so it needs to point at a real repo:
+# the actual Rubidium compiler lives in the "Rubidium" repo, not "xeon".
+CORE_REPO_NAME  = "Rubidium"
 CORE_RAW_BASE   = f"https://raw.githubusercontent.com/{PKG_REPO_OWNER}/{CORE_REPO_NAME}/{PKG_REPO_BRANCH}"
+# Everything compiler.py/debug.py need to actually run stand-alone from
+# ~/.xeon — they import lexer/parser/rub_ast/codegen from their own
+# directory, so fetching only the first two (the old behavior here) left
+# ~/.xeon unable to run either one at all.
+RUBIDIUM_TOOLCHAIN_FILES = ("compiler.py", "debug.py", "lexer.py", "parser.py", "rub_ast.py", "codegen.py")
+
+# xeon.py's own CLI script lives in a SEPARATE repo from the compiler
+# (mirrors XEON_URL vs REPO_URL in install.sh) — not CORE_REPO_NAME/
+# CORE_RAW_BASE above, which is the Rubidium compiler's repo.
+XEON_CLI_REPO_NAME = "Xeon-Rubidium"
+XEON_CLI_RAW_BASE  = f"https://raw.githubusercontent.com/{PKG_REPO_OWNER}/{XEON_CLI_REPO_NAME}/{PKG_REPO_BRANCH}"
+
+# Vire's own repo — same owner/branch convention as the core Rubidium repo
+# above, just a different name.
+VIRE_REPO_NAME = "Rubidium-Vire"
+VIRE_RAW_BASE  = f"https://raw.githubusercontent.com/{PKG_REPO_OWNER}/{VIRE_REPO_NAME}/{PKG_REPO_BRANCH}"
+# Same reasoning as RUBIDIUM_TOOLCHAIN_FILES above — Vire's compiler.py
+# needs its own lexer/parser/rub_ast/codegen sitting alongside it too.
+VIRE_TOOLCHAIN_FILES = ("compiler.py", "debug.py", "lexer.py", "parser.py", "rub_ast.py", "codegen.py")
 
 PKG_LIST_PATH  = XEON_DIR / "pkg-list"
 PACKAGES_DIR   = XEON_DIR / "packages"
@@ -57,6 +95,66 @@ def _require_compiler():
         print(f"✖ Compiler not found at {COMPILER_SCRIPT}")
         print("  Please ensure Rubidium is installed in ~/.xeon")
         sys.exit(1)
+
+
+def _require_vire_compiler():
+    if not VIRE_COMPILER_SCRIPT.exists():
+        print(f"✖ Vire compiler not found at {VIRE_COMPILER_SCRIPT}")
+        print(f"  Please ensure Vire is installed in {VIRE_DIR}")
+        sys.exit(1)
+
+
+def _shared_lib_ext():
+    if os.name == "nt":
+        return ".dll"
+    if sys.platform == "darwin":
+        return ".dylib"
+    return ".so"
+
+
+def _compile_vire_files(build_dir):
+    """Find every .vire source under src/ and compile each one straight
+    into build/ at the same relative path (mirrored to a shared-lib
+    extension) — a .vire file's only output IS a wrapper .so, so this both
+    "compiles them" and "copies over the produced .so" in one step: the
+    compiler writes directly to where the .rub compile step below expects
+    an FFI("...") target to already be. Runs BEFORE the src/ .so/.dll/
+    .dylib bundling loop and BEFORE the main Rubidium compile, so by the
+    time the real program is built, every wrapper it might FFI-load is
+    already sitting in build/ next to it.
+    """
+    vire_files = []
+    for root, _, files in os.walk("src"):
+        for fname in files:
+            if fname.endswith(".vire"):
+                vire_files.append(Path(root) / fname)
+
+    if not vire_files:
+        return 0
+
+    _require_vire_compiler()
+    so_ext = _shared_lib_ext()
+
+    for vire_path in vire_files:
+        rel_path = vire_path.relative_to("src")
+        out_path = build_dir / rel_path.with_suffix(so_ext)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+
+        print(f"Compiling Vire wrapper {rel_path} → build/{rel_path.with_suffix(so_ext)}...")
+        sys.stdout.flush()   # see the flush() note in run_debugger() — same reason
+
+        # Vire has no entry point of its own (see the EXECUTION MODEL
+        # section of its syntax reference) — every .vire build is a
+        # shared library, so -s isn't optional here the way it is for -s
+        # on the Rubidium side.
+        cmd = [sys.executable, str(VIRE_COMPILER_SCRIPT), "-s", str(vire_path), str(out_path)]
+        res = subprocess.run(cmd)
+        if res.returncode != 0:
+            print(f"✖ Vire build failed for {rel_path}.")
+            sys.exit(1)
+
+    print(f"  {len(vire_files)} Vire wrapper(s) compiled")
+    return len(vire_files)
 
 
 def run_debugger(main_file):
@@ -160,6 +258,8 @@ def build_project(no_debug=False, shared=False, native=None):
 
     build_dir.mkdir(parents=True)
 
+    _compile_vire_files(build_dir)
+
     bundled = 0
 
     for root, _, files in os.walk("src"):
@@ -251,9 +351,11 @@ def xeon_update():
     print("🔄 Updating Xeon toolchain and CLI...")
     XEON_DIR.mkdir(parents=True, exist_ok=True)
 
-    # 1. Update core backend scripts
-    for script_name, dest_path in [("compiler.py", COMPILER_SCRIPT), ("debug.py", DEBUGGER_SCRIPT)]:
+    # 1. Update core backend scripts (compiler.py/debug.py AND their own
+    # lexer/parser/rub_ast/codegen dependencies — see RUBIDIUM_TOOLCHAIN_FILES)
+    for script_name in RUBIDIUM_TOOLCHAIN_FILES:
         url = f"{CORE_RAW_BASE}/{script_name}"
+        dest_path = XEON_DIR / script_name
         print(f"  Fetching latest {script_name}...")
         try:
             _http_download(url, dest_path)
@@ -261,9 +363,22 @@ def xeon_update():
         except (urllib.error.URLError, urllib.error.HTTPError) as e:
             print(f"  ✖ Failed to update {script_name}: {e}")
 
-    # 2. Attempt to update the running CLI executable script itself
+    # 2. Update the Vire toolchain, into its own subfolder (see VIRE_DIR).
+    VIRE_DIR.mkdir(parents=True, exist_ok=True)
+    for script_name in VIRE_TOOLCHAIN_FILES:
+        url = f"{VIRE_RAW_BASE}/{script_name}"
+        dest_path = VIRE_DIR / script_name
+        print(f"  Fetching latest vire/{script_name}...")
+        try:
+            _http_download(url, dest_path)
+            print(f"  ✔ Updated vire/{script_name}")
+        except (urllib.error.URLError, urllib.error.HTTPError) as e:
+            print(f"  ✖ Failed to update vire/{script_name}: {e}")
+
+    # 3. Attempt to update the running CLI executable script itself — its
+    # own repo (Xeon-Rubidium), not CORE_RAW_BASE (the compiler's repo).
     current_script = Path(sys.argv[0]).resolve()
-    script_url = f"{CORE_RAW_BASE}/xeon.py"
+    script_url = f"{XEON_CLI_RAW_BASE}/xeon.py"
     print("  Fetching latest xeon CLI script...")
     try:
         data = _http_get_bytes(script_url)
