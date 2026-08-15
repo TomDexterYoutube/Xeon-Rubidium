@@ -1,5 +1,6 @@
 import sys
 import os
+import re
 import subprocess
 import shutil
 import time
@@ -157,6 +158,75 @@ def _compile_vire_files(build_dir):
     return len(vire_files)
 
 
+_FFI_CALL_RE = re.compile(r'FFI\(\s*"([^"]+)"\s*\)')
+
+
+def _collect_ffi_lib_paths():
+    """Scan every .rub/.vire source file under src/ for FFI("path") calls
+    with a literal string path, returning the set of distinct relative
+    paths actually referenced anywhere in the project (both languages —
+    a .rub can FFI-load a .vire-compiled wrapper, and a .vire can FFI-load
+    a real C library, and either can reference either). A plain regex
+    scan rather than a real parse: FFI("...") is a simple, fixed literal
+    pattern, and this only needs to find candidate strings, not fully
+    understand the source — the real compiler still catches anything a
+    loose regex match gets wrong when it actually builds."""
+    paths = set()
+    for root, _, files in os.walk("src"):
+        for fname in files:
+            if fname.endswith((".rub", ".vire")):
+                fpath = Path(root) / fname
+                try:
+                    text = fpath.read_text(errors="replace")
+                except OSError:
+                    continue
+                for m in _FFI_CALL_RE.finditer(text):
+                    paths.add(m.group(1))
+    return paths
+
+
+def _bundle_ffi_libs(build_dir):
+    """Copy only the .so/.dll/.dylib files an FFI("path") call somewhere in
+    src/ (.rub or .vire) ACTUALLY references — at that exact path, any
+    depth of subfolders — instead of blindly copying every shared library
+    sitting anywhere under src/ regardless of whether anything uses it.
+    Looks for the real file at src/<path> (the established convention: a
+    lib referenced as FFI("lib/foo.so") lives at src/lib/foo.so during
+    development) and copies it to build/<path>, preserving that same
+    structure so the relative path still resolves once the compiled
+    binary later runs with build/ (or its own directory — see ffi_load's
+    exe-relative fallback) reachable the same way.
+    """
+    ffi_paths = _collect_ffi_lib_paths()
+    bundled = 0
+    missing = []
+    for rel in sorted(ffi_paths):
+        if not rel.endswith((".so", ".dll", ".dylib")):
+            continue  # not a bundle-able file target (a bare/versioned
+                       # library name resolved at runtime some other way)
+        src_path = Path("src") / rel
+        if not src_path.exists():
+            # A .vire-produced wrapper (e.g. FFI("wrapper.so") backed by
+            # src/wrapper.vire) has nothing to copy here — _compile_vire_
+            # files already placed the REAL build/wrapper.so; this path
+            # just never had a matching file under src/ to begin with.
+            vire_source = src_path.with_suffix(".vire")
+            if not vire_source.exists():
+                missing.append(rel)
+            continue
+        dst_path = build_dir / rel
+        dst_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src_path, dst_path)
+        print(f"  bundled FFI lib → build/{rel}")
+        bundled += 1
+
+    if bundled:
+        print(f"  {bundled} FFI library file(s) bundled")
+    if missing:
+        print(f"  Note: FFI path(s) referenced in code but not found under src/: {', '.join(missing)}")
+    return bundled
+
+
 def run_debugger(main_file):
     if not DEBUGGER_SCRIPT.exists():
         print("⚠ Debugger not found. Skipping debug checks.")
@@ -260,24 +330,10 @@ def build_project(no_debug=False, shared=False, native=None):
 
     _compile_vire_files(build_dir)
 
-    bundled = 0
-
-    for root, _, files in os.walk("src"):
-        for fname in files:
-            if fname.endswith((".so", ".dll", ".dylib")):
-                src_path = Path(root) / fname
-                rel_path = src_path.relative_to("src")
-
-                dst_path = build_dir / rel_path
-                dst_path.parent.mkdir(parents=True, exist_ok=True)
-
-                shutil.copy2(src_path, dst_path)
-
-                print(f"  bundled FFI lib → build/{rel_path}")
-                bundled += 1
-
-    if bundled:
-        print(f"  {bundled} FFI library file(s) bundled")
+    # syntax: FFI — only the libraries an FFI("path") call somewhere in
+    # src/ actually references get bundled (see _bundle_ffi_libs), not
+    # every .so/.dll/.dylib sitting anywhere under src/ regardless of use.
+    _bundle_ffi_libs(build_dir)
 
     project_name = Path.cwd().name
 
