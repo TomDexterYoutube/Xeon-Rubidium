@@ -216,6 +216,9 @@ def _bundle_ffi_libs(build_dir):
             continue
         dst_path = build_dir / rel
         dst_path.parent.mkdir(parents=True, exist_ok=True)
+        if src_path.resolve() == dst_path.resolve():
+            continue
+
         shutil.copy2(src_path, dst_path)
         print(f"  bundled FFI lib → build/{rel}")
         bundled += 1
