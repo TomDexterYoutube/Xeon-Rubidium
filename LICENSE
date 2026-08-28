@@ -1,0 +1,307 @@
+# Rub-Dev License
+
+**Version 1.0, 28/8/2026**
+
+**License Repository:**
+https://github.com/TomDexterYoutube/Rub-Dev-LICENSE
+
+---
+
+## LICENSE INFORMATION
+
+```text
+Copyright (c) 28/8/2026 Max Kenein
+Project: Xeon-Rubidium
+Licensed under the Rub-Dev License, Version 1.0.
+```
+
+### Contributors
+
+
+
+---
+
+# TERMS AND CONDITIONS FOR USE, REPRODUCTION, MODIFICATION, AND DISTRIBUTION
+
+## 1. Definitions
+
+**"License"** means the Rub-Dev License, Version 1.0.
+
+**"Owner"** means the copyright holder or other party authorized to distribute the Work under this License.
+
+**"You"** or **"Your"** means any individual or legal entity exercising rights granted by this License.
+
+**"Work"** means the software, source code, documentation, configuration files, assets, or other material distributed by the Owner under this License.
+
+**"Source Code"** means the preferred form of the Work for making modifications.
+
+**"Compiled Form"** means any form of the Work produced from the Source Code, including compiled binaries, libraries, generated files, or other transformed forms.
+
+**"Modification"** means any change, addition, deletion, or other alteration made to the Work.
+
+**"Derivative Work"** means a work based upon, derived from, modified from, or incorporating all or part of the Work, where such work would otherwise constitute a derivative work under applicable copyright law.
+
+**"Contribution"** means code, documentation, assets, or other material intentionally submitted to the Owner or to the project's official source repository for possible inclusion in the Work.
+
+**"Contributor"** means a person or legal entity whose Contribution has been incorporated into the Work.
+
+**"Contributor Record"** means the list of Contributors and summaries included with the Work for the purpose of acknowledging contributions. A Contributor Record does not grant ownership, control, governance rights, royalties, or any other additional rights to a Contributor.
+
+---
+
+## 2. Grant of Rights
+
+Subject to the terms and conditions of this License, the Owner grants You a perpetual, worldwide, non-exclusive, royalty-free license to:
+
+* use the Work for any purpose;
+* copy the Work;
+* modify the Work;
+* create Derivative Works;
+* publish the Work;
+* distribute the Work;
+* distribute Modified versions of the Work;
+* use the Work commercially;
+* sell copies of the Work;
+* include the Work in other software or products; and
+* sublicense portions of a Derivative Work where legally permitted, provided that such sublicensing does not remove or restrict the rights granted by this License to the original Work or to portions of the Work that You did not create.
+
+These rights apply to both Source Code and Compiled Forms.
+
+No payment, royalty, or other fee is required to exercise the rights granted by this License.
+
+---
+
+## 3. Redistribution
+
+You may reproduce and distribute the Work or any Modification in Source Code or Compiled Form, with or without changes, provided that:
+
+**(a)** You must include a complete, unmodified copy of this License with any distribution of the Work, any Modification, or any product containing any portion of the Work. You may not alter, abridge, replace, or remove this License when distributing the Work or any portion of the Work. The requirement to include this License applies regardless of whether the Work is distributed in Source Code, Compiled Form, as part of another software product, or as part of a larger work;
+
+**(b)** You retain existing copyright, license, patent, trademark, and attribution notices that apply to the Work;
+
+**(c)** If You distribute modified Source Code, You clearly identify files or portions of the Work that You have modified;
+
+**(d)** You do not claim that Your modifications were created by the Owner or any Contributor unless they actually were; and
+
+**(e)** You do not use the Owner's or project's trademarks, logos, or branding in a manner that implies endorsement of Your version without permission.
+
+You may charge any price You choose for distributing the Work, modified versions of the Work, or products containing the Work.
+
+You are not required to publish, disclose, or distribute the Source Code of Your modifications, unless otherwise required by this License or applicable law.
+
+You may license Your original modifications under additional or different terms, including proprietary terms, provided that such terms do not restrict the rights granted by this License to the original Work or to portions of the Work that You did not create.
+
+---
+
+## 4. Contributions
+
+A Contribution does not grant the Contributor any right to control, manage, govern, or make decisions on behalf of the project, its source code, its repository, or its distribution.
+
+A Contribution does not grant the Contributor ownership, voting rights, management authority, or any other special rights over the project merely because the Contribution is accepted.
+
+The Contributor retains any copyright ownership that they independently hold in their original Contribution unless they separately agree in writing to transfer that ownership.
+
+By submitting a Contribution for inclusion in the Work, the Contributor grants the Owner and all recipients of the Work a perpetual, worldwide, non-exclusive, royalty-free, irrevocable license, to the extent legally permitted, to use, reproduce, modify, incorporate, publish, distribute, sublicense, and otherwise use the Contribution as part of the Work.
+
+The Owner may accept, reject, modify, remove, replace, or redistribute a Contribution without requiring additional permission from the Contributor, subject to applicable law and any separate written agreement.
+
+A Contributor does not receive royalties, payment, ownership, control, or other compensation solely because their Contribution has been accepted into or distributed as part of the Work.
+
+Submitting a Contribution does not create a partnership, employment relationship, agency relationship, joint ownership arrangement, or other legal relationship between the Contributor and the Owner unless a separate written agreement explicitly establishes such a relationship.
+
+Each Contributor represents that, to the best of their knowledge, they have sufficient rights and authority to grant the licenses provided for their Contribution under this License.
+
+Nothing in this section transfers ownership of copyright in a Contribution to the Owner unless the Contributor separately agrees to such a transfer in writing.
+---
+
+## 5. Contributor Records
+
+The Owner may maintain a Contributor Record identifying individuals or entities whose Contributions have been incorporated into the Work.
+
+A Contributor Record may contain:
+
+* the Contributor's name or chosen identifier;
+* a summary of the Contributor's work;
+* the date or version in which the Contribution was incorporated; and
+* other information reasonably related to acknowledging the Contribution.
+
+A Contributor Record exists solely for attribution and record-keeping purposes.
+
+A Contributor Record does not grant the Contributor ownership, control, governance rights, voting rights, royalties, payment, management authority, or any other additional rights in the Work or project.
+
+The inclusion of a person or entity in a Contributor Record does not create a partnership, joint ownership arrangement, employment relationship, agency relationship, or other legal relationship with the Owner.
+
+The Owner may correct, update, reorganize, or remove entries in a Contributor Record when reasonably necessary to maintain accurate project records.
+
+---
+
+## 6. Patent License and Patent Litigation
+
+Each Contributor grants the Owner and every recipient of the Work a perpetual, worldwide, non-exclusive, royalty-free license to use, make, have made, sell, offer for sale, import, modify, and otherwise distribute the Work with respect to any patent claims that the Contributor has the legal authority to license and that are necessarily infringed by the Contributor's Contribution, either by itself or when combined with the Work.
+
+This patent license exists so that the Work and Contributions may be freely used, modified, and distributed without the Contributor asserting applicable patent rights against those uses.
+
+If a Contributor brings or participates in a patent lawsuit against the Owner or a recipient of the Work alleging that the Work, the Contributor's Contribution, or the combination of the Contribution with the Work infringes a patent covered by the patent license granted by that Contributor under this License, the patent rights granted by that Contributor under this License shall terminate immediately upon the filing of that lawsuit.
+
+The termination described above applies only to the patent rights granted by the Contributor under this License and does not prevent either party from exercising rights that cannot legally be waived or terminated.
+
+Each Contributor represents that, to the best of their knowledge, they have the legal authority to grant the patent rights described in this section.
+
+No patent rights are granted for patents that a Contributor does not have the legal authority to license.
+
+---
+
+## 7. Contributions From Third Parties
+
+A Contributor must not intentionally submit material to the Work that they do not have the right to contribute.
+
+If a Contribution contains material owned by another person or entity, the Contributor must disclose the relevant ownership and licensing information to the Owner before or when submitting the Contribution.
+
+The Owner is not required to accept any Contribution.
+
+A Contribution may be rejected if the Owner believes that its inclusion could create legal, licensing, copyright, patent, trademark, or other intellectual-property issues.
+
+---
+
+## 8. Trademarks
+
+This License does not grant permission to use the names, trademarks, service marks, logos, project names, or other branding belonging to the Owner, Rub-Dev, or projects distributed by Rub-Dev.
+
+You may use project names or trademarks when reasonably necessary to accurately describe the Work, compatibility with the Work, or the origin of the Work, provided that such use does not imply endorsement, sponsorship, or affiliation where none exists.
+
+---
+
+## 9. No Warranty
+
+THE WORK IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED.
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE OWNER AND CONTRIBUTORS DISCLAIM ALL WARRANTIES AND CONDITIONS, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT.
+
+YOU ARE SOLELY RESPONSIBLE FOR DETERMINING WHETHER THE WORK IS SUITABLE FOR YOUR PURPOSES.
+
+THE OWNER AND CONTRIBUTORS DO NOT GUARANTEE THAT THE WORK WILL BE ERROR-FREE, SECURE, RELIABLE, AVAILABLE, OR SUITABLE FOR ANY PARTICULAR PURPOSE.
+
+---
+
+## 10. Limitation of Liability
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE OWNER AND CONTRIBUTORS SHALL NOT BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, OR OTHER DAMAGES ARISING FROM OR RELATED TO THE USE OF, INABILITY TO USE, MODIFICATION OF, OR DISTRIBUTION OF THE WORK.
+
+THIS INCLUDES, WITHOUT LIMITATION, LOSS OF DATA, LOSS OF PROFITS, LOSS OF BUSINESS, BUSINESS INTERRUPTION, COMPUTER FAILURE, SOFTWARE FAILURE, OR OTHER COMMERCIAL OR NON-COMMERCIAL DAMAGES.
+
+THIS LIMITATION APPLIES REGARDLESS OF THE LEGAL THEORY ON WHICH LIABILITY IS ASSERTED, INCLUDING CONTRACT, NEGLIGENCE, TORT, OR OTHERWISE.
+
+NOTHING IN THIS LICENSE EXCLUDES OR LIMITS LIABILITY THAT CANNOT LAWFULLY BE EXCLUDED OR LIMITED UNDER APPLICABLE LAW.
+
+---
+
+## 11. Acceptance of Additional Liability
+
+While redistributing the Work or a Derivative Work, You may choose to provide support, warranty, indemnification, or other services or obligations for a fee or without charge.
+
+Any such obligations are Your responsibility alone.
+
+You may not impose such obligations on the Owner or any Contributor without their explicit written agreement.
+
+If You provide such obligations, You agree to protect and indemnify the Owner and Contributors against liabilities arising solely from the additional obligations You have chosen to provide.
+
+---
+
+## 12. No Additional Restrictions
+
+You may not impose legal or technical restrictions that prevent recipients of the Work from exercising the rights granted to them by this License with respect to the original Work.
+
+This does not prevent You from applying separate terms to Your own modifications or other independent work, provided that those terms do not remove the rights granted by this License to the original Work.
+
+---
+
+## 13. Acceptance
+
+By using, copying, modifying, distributing, or otherwise exercising rights granted by this License, You accept and agree to the terms of this License.
+
+If You do not agree to the terms of this License, You may not exercise the rights granted by this License.
+
+---
+
+## 14. Termination
+
+Your rights under this License terminate automatically if You materially violate the terms of this License.
+
+Rights granted under this License may be reinstated if the violation is cured within a reasonable period after discovery or written notice, provided that the Owner has not expressly terminated those rights.
+
+Termination does not affect rights already granted to recipients who received the Work before termination and who remain in compliance with this License.
+
+---
+
+# END OF TERMS AND CONDITIONS
+
+# HOW TO APPLY THE RUB-DEV LICENSE
+
+To apply the Rub-Dev License to a project, include a copy of this License with the project and include a copyright and license notice identifying the copyright holder.
+
+The recommended project header is:
+
+```text
+Copyright (c) [DD/MM/YYYY] [NAME OF OWNER]
+Project: [PROJECT NAME]
+Licensed under the Rub-Dev License, Version 1.0.
+```
+
+A Contributor Record may then be included:
+
+```text
+## Contributors
+
+[CONTRIBUTOR NAME] {
+    Summary: [SUMMARY OF WORK]
+}
+```
+
+For example:
+
+```text
+Copyright (c) 28/08/2026 TomDexterYoutube
+Project: Rubidium
+Licensed under the Rub-Dev License, Version 1.0.
+
+## Contributors
+
+ExampleDev {
+    Summary: Added ARM64 support and improved compiler error handling.
+}
+
+AnotherDev {
+    Summary: Added the networking library.
+}
+```
+
+The notice may be placed in the appropriate comment format for the programming language or file type.
+
+For repositories containing multiple projects or components, the Owner may specify which files or components are covered by this License.
+
+---
+
+# COPYRIGHT
+
+Copyright ownership remains with the applicable copyright holder or holders.
+
+Receiving, using, modifying, or contributing to a Work does not by itself transfer copyright ownership.
+
+Contributors retain rights they independently hold in their original Contributions, subject to the licenses granted by this License.
+
+A Contributor Record is an acknowledgement of work performed and does not alter copyright ownership or grant additional rights.
+
+---
+
+# LICENSE IDENTIFICATION
+
+This software is licensed under:
+
+**Rub-Dev License, Version 1.0**
+
+Official license repository:
+
+https://github.com/TomDexterYoutube/Rub-Dev-LICENSE
+
+The Rub-Dev License may be copied and distributed for the purpose of licensing software under the Rub-Dev License. Modified versions of this license must not be represented as the official Rub-Dev License unless authorized by the Owner.
+
