@@ -144,8 +144,12 @@ catch {
 Write-Host "    Python: $pyVersion" -ForegroundColor Gray
 Write-Host "    Path:   $($pythonCommand.Source)" -ForegroundColor Gray
 
-if ($pyVersion -lt [version]"3.13") {
-    Write-ErrorMessage "Python 3.13+ is required."
+if (
+    $pyVersion.Major -ne 3 -or
+    $pyVersion.Minor -lt 12 -or
+    $pyVersion.Minor -gt 13
+) {
+    Write-ErrorMessage "Python 3.12 or 3.13 is required."
     Write-Host "    Current version: $pyVersion" -ForegroundColor Yellow
     exit 1
 }
