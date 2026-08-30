@@ -1,122 +1,404 @@
+```powershell
 $ErrorActionPreference = "Stop"
 
-# Prevent running as Administrator (mimicking the non-root check)
-$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+# ============================================================
+# Xeon / Rubidium Windows Installer
+# ============================================================
+
+# ------------------------------------------------------------
+# Prevent Administrator execution
+# ------------------------------------------------------------
+
+$isAdmin = (
+    [Security.Principal.WindowsPrincipal](
+        [Security.Principal.WindowsIdentity]::GetCurrent()
+    )
+).IsInRole(
+    [Security.Principal.WindowsBuiltInRole]::Administrator
+)
+
 if ($isAdmin) {
     Write-Host "[!] Please run this script as a normal user, not as Administrator." -ForegroundColor Yellow
-    Exit
+    exit 1
 }
 
-# Define Paths
-$XEON_DIR = Join-Path $HOME ".xeon"
-$VIRE_DIR = Join-Path $XEON_DIR "vire"
-$BIN_DIR = Join-Path $HOME ".local\bin"
-$REPO_URL = "https://github.com/TomDexterYoutube/Rubidium/archive/refs/heads/main.zip"
-$VIRE_REPO_URL = "https://github.com/TomDexterYoutube/Rubidium-Vire/archive/refs/heads/main.zip"
+# ------------------------------------------------------------
+# Configuration
+# ------------------------------------------------------------
 
-# Create directories if they don't exist
+$XEON_DIR       = Join-Path $HOME ".xeon"
+$VIRE_DIR       = Join-Path $XEON_DIR "vire"
+
+# Use a proper Windows user bin directory.
+$BIN_DIR        = Join-Path $HOME ".local\bin"
+
+$REPO_URL       = "https://github.com/TomDexterYoutube/Rubidium/archive/refs/heads/main.zip"
+$VIRE_REPO_URL  = "https://github.com/TomDexterYoutube/Rubidium-Vire/archive/refs/heads/main.zip"
+$XEON_RAW_URL   = "https://raw.githubusercontent.com/TomDexterYoutube/Xeon-Rubidium/main/xeon.py"
+
+# ------------------------------------------------------------
+# Helper functions
+# ------------------------------------------------------------
+
+function Write-Step {
+    param(
+        [string]$Number,
+        [string]$Message
+    )
+
+    Write-Host "[$Number] $Message" -ForegroundColor Cyan
+}
+
+function Write-ErrorMessage {
+    param(
+        [string]$Message
+    )
+
+    Write-Host "[!] $Message" -ForegroundColor Red
+}
+
+function Download-File {
+    param(
+        [string]$Url,
+        [string]$Destination
+    )
+
+    try {
+        Invoke-WebRequest `
+            -Uri $Url `
+            -OutFile $Destination `
+            -UseBasicParsing
+
+        return $true
+    }
+    catch {
+        Write-ErrorMessage "Failed to download:"
+        Write-Host "    $Url" -ForegroundColor DarkGray
+        Write-Host "    $($_.Exception.Message)" -ForegroundColor DarkGray
+
+        return $false
+    }
+}
+
+function Find-ExtractedFolder {
+    param(
+        [string]$Directory,
+        [string]$Pattern,
+        [string]$ExcludePattern = ""
+    )
+
+    $folders = Get-ChildItem `
+        -Path $Directory `
+        -Directory `
+        -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.Name -like $Pattern
+        }
+
+    if ($ExcludePattern -ne "") {
+        $folders = $folders | Where-Object {
+            $_.Name -notlike $ExcludePattern
+        }
+    }
+
+    return $folders | Select-Object -First 1
+}
+
+# ------------------------------------------------------------
+# Create directories
+# ------------------------------------------------------------
+
 New-Item -ItemType Directory -Force -Path $XEON_DIR | Out-Null
 New-Item -ItemType Directory -Force -Path $VIRE_DIR | Out-Null
 New-Item -ItemType Directory -Force -Path $BIN_DIR | Out-Null
 
-# Copy local xeon.py to the setup folder
-if (Test-Path "xeon.py") {
-    Copy-Item "xeon.py" -Destination $XEON_DIR -Force
-} else {
-    Write-Host "[!] xeon.py not found in current directory. Proceeding anyway..." -ForegroundColor Yellow
+# ------------------------------------------------------------
+# Check Python
+# ------------------------------------------------------------
+
+Write-Step "1/6" "Checking system..."
+
+$pythonCommand = Get-Command "python" -ErrorAction SilentlyContinue
+
+if (-not $pythonCommand) {
+    Write-ErrorMessage "Python is not installed or is not available in PATH."
+    Write-Host "Install Python 3.13+ and make sure 'Add Python to PATH' is enabled." -ForegroundColor Yellow
+    exit 1
 }
 
-Write-Host "[1/6] Checking system..."
-# Check for Python
-if (-not (Get-Command "python" -ErrorAction SilentlyContinue)) {
-    Write-Host "[!] Python is not installed or not in your PATH." -ForegroundColor Red
-    Exit
+# Get Python version safely.
+try {
+    $pyVersionText = & python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "Python returned exit code $LASTEXITCODE"
+    }
+
+    $pyVersion = [version]$pyVersionText.Trim()
+}
+catch {
+    Write-ErrorMessage "Could not determine the installed Python version."
+    exit 1
 }
 
-# Check Python Version (Requires 3.13+)
-$pyVersion = python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
-if ([version]$pyVersion -lt [version]"3.13") {
-    Write-Host "[!] Python 3.13+ required. Your current version is $pyVersion. Please update Python." -ForegroundColor Red
-    Exit
+Write-Host "    Python: $pyVersion" -ForegroundColor Gray
+Write-Host "    Path:   $($pythonCommand.Source)" -ForegroundColor Gray
+
+if ($pyVersion -lt [version]"3.13") {
+    Write-ErrorMessage "Python 3.13+ is required."
+    Write-Host "    Current version: $pyVersion" -ForegroundColor Yellow
+    exit 1
 }
 
-# Create a temporary directory
-$TMP_DIR = Join-Path [System.IO.Path]::GetTempPath() ([System.IO.Path]::GetRandomFileName())
+# ------------------------------------------------------------
+# Temporary directory
+# ------------------------------------------------------------
+
+$TMP_DIR = Join-Path `
+    ([System.IO.Path]::GetTempPath()) `
+    ("xeon-" + [System.Guid]::NewGuid().ToString())
+
 New-Item -ItemType Directory -Path $TMP_DIR | Out-Null
 
-Write-Host "[2/6] Fetching Rubidium source..."
-$zipPath = Join-Path $TMP_DIR "rubidium.zip"
 try {
-    Invoke-WebRequest -Uri $REPO_URL -OutFile $zipPath -UseBasicParsing
-} catch {
-    Write-Host "[!] Download failed. Check connection." -ForegroundColor Red
-    Remove-Item -Recurse -Force $TMP_DIR
-    Exit
-}
 
-Write-Host "[3/6] Extracting Rubidium..."
-Expand-Archive -Path $zipPath -DestinationPath $TMP_DIR -Force
+    # --------------------------------------------------------
+    # Copy local xeon.py if available
+    # --------------------------------------------------------
 
-# Locate the extracted folder (handling variable naming). Excludes any
-# *Vire* match so this can't accidentally pick up a Rubidium-Vire-main
-# folder if one is ever extracted into the same temp dir.
-$extractedFolder = Get-ChildItem -Path $TMP_DIR -Directory | Where-Object { $_.Name -like "*Rubidium*" -and $_.Name -notlike "*Vire*" } | Select-Object -First 1
+    if (Test-Path ".\xeon.py" -PathType Leaf) {
+        Copy-Item `
+            ".\xeon.py" `
+            (Join-Path $XEON_DIR "xeon.py") `
+            -Force
 
-Write-Host "[4/6] Copying Rubidium files..."
-if ($extractedFolder) {
-    # Copy all files inside the extracted folder to .xeon
-    Copy-Item -Path "$($extractedFolder.FullName)\*" -Destination $XEON_DIR -Recurse -Force
-}
-
-# Vire — the FFI compatibility layer's own toolchain (compiler.py/debug.py/
-# lexer.py/parser.py/rub_ast.py/codegen.py). It lives in its own vire\
-# subfolder rather than flattened into $XEON_DIR alongside Rubidium's
-# identically-named files, which it would otherwise collide with.
-Write-Host "[5/6] Fetching and extracting Vire..."
-$vireZipPath = Join-Path $TMP_DIR "vire.zip"
-try {
-    Invoke-WebRequest -Uri $VIRE_REPO_URL -OutFile $vireZipPath -UseBasicParsing
-    Expand-Archive -Path $vireZipPath -DestinationPath $TMP_DIR -Force
-    $vireExtractedFolder = Get-ChildItem -Path $TMP_DIR -Directory | Where-Object { $_.Name -like "*Vire*" } | Select-Object -First 1
-    if ($vireExtractedFolder) {
-        Copy-Item -Path "$($vireExtractedFolder.FullName)\*" -Destination $VIRE_DIR -Recurse -Force
+        Write-Host "    Installed local xeon.py" -ForegroundColor Gray
     }
-} catch {
-    Write-Host "[!] Failed to download Vire — continuing without it (FFI wrapper builds won't work until 'xeon update' succeeds)." -ForegroundColor Yellow
+    else {
+        Write-Host "    Local xeon.py not found." -ForegroundColor Yellow
+    }
+
+    # --------------------------------------------------------
+    # Fetch Rubidium
+    # --------------------------------------------------------
+
+    Write-Step "2/6" "Fetching Rubidium source..."
+
+    $rubidiumZip = Join-Path $TMP_DIR "rubidium.zip"
+
+    if (-not (Download-File $REPO_URL $rubidiumZip)) {
+        throw "Rubidium download failed."
+    }
+
+    # --------------------------------------------------------
+    # Extract Rubidium
+    # --------------------------------------------------------
+
+    Write-Step "3/6" "Extracting Rubidium..."
+
+    Expand-Archive `
+        -Path $rubidiumZip `
+        -DestinationPath $TMP_DIR `
+        -Force
+
+    $rubidiumFolder = Find-ExtractedFolder `
+        -Directory $TMP_DIR `
+        -Pattern "*Rubidium*" `
+        -ExcludePattern "*Vire*"
+
+    if (-not $rubidiumFolder) {
+        throw "Could not find the extracted Rubidium directory."
+    }
+
+    Write-Host "    Found: $($rubidiumFolder.Name)" -ForegroundColor Gray
+
+    # --------------------------------------------------------
+    # Copy Rubidium
+    # --------------------------------------------------------
+
+    Write-Host "    Installing Rubidium..." -ForegroundColor Gray
+
+    Copy-Item `
+        -Path (Join-Path $rubidiumFolder.FullName "*") `
+        -Destination $XEON_DIR `
+        -Recurse `
+        -Force
+
+    # --------------------------------------------------------
+    # Fetch Vire
+    # --------------------------------------------------------
+
+    Write-Step "4/6" "Fetching Vire..."
+
+    $vireZip = Join-Path $TMP_DIR "vire.zip"
+
+    if (Download-File $VIRE_REPO_URL $vireZip) {
+
+        Expand-Archive `
+            -Path $vireZip `
+            -DestinationPath $TMP_DIR `
+            -Force
+
+        $vireFolder = Find-ExtractedFolder `
+            -Directory $TMP_DIR `
+            -Pattern "*Rubidium-Vire*"
+
+        if (-not $vireFolder) {
+            # Fallback in case GitHub changes the archive name.
+            $vireFolder = Find-ExtractedFolder `
+                -Directory $TMP_DIR `
+                -Pattern "*Vire*"
+        }
+
+        if ($vireFolder) {
+
+            Write-Host "    Found: $($vireFolder.Name)" -ForegroundColor Gray
+
+            Copy-Item `
+                -Path (Join-Path $vireFolder.FullName "*") `
+                -Destination $VIRE_DIR `
+                -Recurse `
+                -Force
+
+            Write-Host "    Vire installed." -ForegroundColor Green
+        }
+        else {
+            Write-Host "[!] Could not locate extracted Vire files." -ForegroundColor Yellow
+        }
+    }
+    else {
+        Write-Host "[!] Vire download failed. Continuing without Vire." -ForegroundColor Yellow
+    }
+
+    # --------------------------------------------------------
+    # Verify xeon.py
+    # --------------------------------------------------------
+
+    if (-not (Test-Path (Join-Path $XEON_DIR "xeon.py") -PathType Leaf)) {
+
+        Write-Host "    Local xeon.py was not available." -ForegroundColor Yellow
+        Write-Host "    Downloading official Xeon launcher..." -ForegroundColor Yellow
+
+        $xeonPath = Join-Path $XEON_DIR "xeon.py"
+
+        if (-not (Download-File $XEON_RAW_URL $xeonPath)) {
+            throw "Could not install xeon.py."
+        }
+    }
+
+    # --------------------------------------------------------
+    # Clean temporary files
+    # --------------------------------------------------------
+
+    Write-Step "5/6" "Cleaning temporary files..."
+
+}
+finally {
+
+    if (Test-Path $TMP_DIR) {
+        Remove-Item `
+            -Path $TMP_DIR `
+            -Recurse `
+            -Force `
+            -ErrorAction SilentlyContinue
+    }
 }
 
-# Clean up temp folder
-Remove-Item -Recurse -Force $TMP_DIR
+# ------------------------------------------------------------
+# Create command wrapper
+# ------------------------------------------------------------
 
-Write-Host "[6/6] Creating wrapper script..."
-# Windows uses .cmd or .ps1 files for command wrappers in PATH. We'll create a cmd batch file.
+Write-Step "6/6" "Creating xeon command..."
+
 $wrapperPath = Join-Path $BIN_DIR "xeon.cmd"
+
+$xeonPython = Join-Path $XEON_DIR "xeon.py"
+
+# CMD only needs to launch Python.
+# Everything else belongs inside xeon.py.
 $wrapperContent = @"
 @echo off
-if "%~1"=="update" (
-    echo Updating Rubidium...
-    powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/TomDexterYoutube/Xeon-Rubidium/main/xeon.py' -OutFile '$XEON_DIR\xeon.py' -UseBasicParsing"
-    powershell -Command "`$tmp = Join-Path ([System.IO.Path]::GetTempPath()) ([System.IO.Path]::GetRandomFileName()); New-Item -ItemType Directory -Path `$tmp | Out-Null; Invoke-WebRequest -Uri '$REPO_URL' -OutFile (Join-Path `$tmp 'rubidium.zip') -UseBasicParsing; Expand-Archive -Path (Join-Path `$tmp 'rubidium.zip') -DestinationPath `$tmp -Force; `$ext = Get-ChildItem `$tmp -Directory | Where-Object { `$_.Name -like '*Rubidium*' -and `$_.Name -notlike '*Vire*' } | Select-Object -First 1; if (`$ext) { Copy-Item -Path (Join-Path `$ext.FullName '*') -Destination '$XEON_DIR' -Recurse -Force }; Remove-Item -Recurse -Force `$tmp"
-    echo Updating Vire...
-    powershell -Command "New-Item -ItemType Directory -Force -Path '$VIRE_DIR' | Out-Null; `$tmp = Join-Path ([System.IO.Path]::GetTempPath()) ([System.IO.Path]::GetRandomFileName()); New-Item -ItemType Directory -Path `$tmp | Out-Null; try { Invoke-WebRequest -Uri '$VIRE_REPO_URL' -OutFile (Join-Path `$tmp 'vire.zip') -UseBasicParsing; Expand-Archive -Path (Join-Path `$tmp 'vire.zip') -DestinationPath `$tmp -Force; `$vext = Get-ChildItem `$tmp -Directory | Where-Object { `$_.Name -like '*Vire*' } | Select-Object -First 1; if (`$vext) { Copy-Item -Path (Join-Path `$vext.FullName '*') -Destination '$VIRE_DIR' -Recurse -Force } } catch { Write-Host '[!] Failed to update Vire' }; Remove-Item -Recurse -Force `$tmp"
-    echo Update complete!
-    goto :eof
-)
-
-python "$XEON_DIR\xeon.py" %*
+python "$xeonPython" %*
 "@
 
-Set-Content -Path $wrapperPath -Value $wrapperContent
+Set-Content `
+    -Path $wrapperPath `
+    -Value $wrapperContent `
+    -Encoding ASCII
 
-# Add $BIN_DIR to User PATH if it isn't already there
-$userPath = [Environment]::GetEnvironmentVariable("PATH", "User")
-if ($userPath -notlike "*$BIN_DIR*") {
-    [Environment]::SetEnvironmentVariable("PATH", "$userPath;$BIN_DIR", "User")
-    Write-Host "✔ Added $BIN_DIR to your User PATH environment variable." -ForegroundColor Green
+# ------------------------------------------------------------
+# Add .local\bin to User PATH
+# ------------------------------------------------------------
+
+$userPath = [Environment]::GetEnvironmentVariable(
+    "PATH",
+    "User"
+)
+
+if ([string]::IsNullOrWhiteSpace($userPath)) {
+    $userPath = ""
 }
 
-Write-Host "`n========================================================" -ForegroundColor Green
-Write-Host "Installation complete!" -ForegroundColor Green
-Write-Host "Please RESTART your terminal/PowerShell window to apply PATH changes." -ForegroundColor Yellow
-Write-Host "Run 'xeon' to start!" -ForegroundColor Green
+# Split PATH into actual entries instead of doing a substring search.
+$pathEntries = $userPath -split ";" |
+    Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+
+$alreadyInPath = $false
+
+foreach ($entry in $pathEntries) {
+    try {
+        if (
+            [System.IO.Path]::GetFullPath($entry).TrimEnd("\") -ieq
+            [System.IO.Path]::GetFullPath($BIN_DIR).TrimEnd("\")
+        ) {
+            $alreadyInPath = $true
+            break
+        }
+    }
+    catch {
+        # Ignore malformed PATH entries.
+    }
+}
+
+if (-not $alreadyInPath) {
+
+    if ([string]::IsNullOrWhiteSpace($userPath)) {
+        $newPath = $BIN_DIR
+    }
+    else {
+        $newPath = "$userPath;$BIN_DIR"
+    }
+
+    [Environment]::SetEnvironmentVariable(
+        "PATH",
+        $newPath,
+        "User"
+    )
+
+    Write-Host "    Added $BIN_DIR to User PATH." -ForegroundColor Green
+}
+else {
+    Write-Host "    $BIN_DIR is already in User PATH." -ForegroundColor Gray
+}
+
+# ------------------------------------------------------------
+# Finished
+# ------------------------------------------------------------
+
+Write-Host ""
 Write-Host "========================================================" -ForegroundColor Green
+Write-Host " Installation complete!" -ForegroundColor Green
+Write-Host "========================================================" -ForegroundColor Green
+Write-Host ""
+Write-Host "Xeon installed to:" -ForegroundColor Gray
+Write-Host "    $XEON_DIR" -ForegroundColor White
+Write-Host ""
+Write-Host "Command wrapper:" -ForegroundColor Gray
+Write-Host "    $wrapperPath" -ForegroundColor White
+Write-Host ""
+Write-Host "IMPORTANT: Restart your terminal/PowerShell window." -ForegroundColor Yellow
+Write-Host ""
+Write-Host "Then run:" -ForegroundColor Gray
+Write-Host "    xeon" -ForegroundColor Green
+Write-Host ""
+```
