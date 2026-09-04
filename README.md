@@ -39,7 +39,6 @@ The installer automatically:
 - Creates the `~/.xeon` directory
 - Installs the Rubidium compiler
 - Installs the VIRE compiler
-- Compiles the xeon tool for **your** machine
 - Adds `xeon` to your system PATH
 
 There is no complicated setup.
