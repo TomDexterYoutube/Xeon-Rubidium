@@ -295,6 +295,8 @@ def init_project():
             '}\n'
         )
 
+    os.subprocess("git init && git add .")
+
     print("✔ Initialized new Rubidium project in ./src")
 
 
