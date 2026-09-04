@@ -4,7 +4,7 @@
 
 Xeon is the complete command-line toolchain for Rubidium. It handles project creation, static analysis, debugging, compilation, package management, and execution from a single command.
 
-Designed to work on **Windows**, **Linux**, and **macOS**, Xeon automatically detects your project root and provides a workflow similar to Cargo, while remaining tailored specifically for Rubidium.
+Designed to work on **Linux Only**, Xeon automatically detects your project root and provides a workflow similar to Cargo, while remaining tailored specifically for Rubidium.
 
 > **Rubidium Source Code:** https://github.com/TomDexterYoutube/Rubidium
 
@@ -29,25 +29,17 @@ Designed to work on **Windows**, **Linux**, and **macOS**, Xeon automatically de
 
 Run the installer for your operating system.
 
-### Windows
-
-```powershell
-install.ps1
-```
-
-### Linux / macOS
-
 ```bash
 bash install.sh
 ```
 
 The installer automatically:
 
-- Installs Python 3 (if required)
 - Installs Clang (if required)
 - Creates the `~/.xeon` directory
 - Installs the Rubidium compiler
-- Installs the debugger
+- Installs the VIRE compiler
+- Compiles the xeon tool for **your** machine
 - Adds `xeon` to your system PATH
 
 There is no complicated setup.
@@ -174,31 +166,13 @@ xeon run --no-debug
 
 Instead of creating an executable, compile a shared library.
 
-Linux
-
-```
-.so
-```
-
-Windows
-
-```
-.dll
-```
-
-macOS
-
-```
-.dylib
-```
-
 Example
 
 ```bash
 xeon build -s
 ```
 
-Shared libraries are intended to be loaded from another language through Rubidium's FFI system.
+Shared libraries are intended to be loaded through Rubidium's FFI system.
 
 Since shared libraries have no program entry point:
 
@@ -423,3 +397,7 @@ If you'd like to support development, the best way is to:
 - Contribute packages
 
 Every report helps make Rubidium better.
+
+# Note to Windows and Mac users
+
+Xeon and Rubidium have some support for your os, Mac is untested and I have only seen Rubidium and xeon half work Once on windows
