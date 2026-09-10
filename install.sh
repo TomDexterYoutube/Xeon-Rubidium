@@ -1,12 +1,6 @@
 #!/bin/bash
 set -e
 
-# Prevent running as root
-if [ "$EUID" -eq 0 ]; then
-    echo "[!] Please run this script as a normal user, not with sudo."
-    exit 1
-fi
-
 cd "$(dirname "$0")"
 
 XEON_DIR="$HOME/.xeon"
