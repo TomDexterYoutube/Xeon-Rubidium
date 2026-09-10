@@ -7,6 +7,7 @@ import time
 import json
 import urllib.request
 import urllib.error
+import subprocess
 from pathlib import Path
 
 
@@ -295,7 +296,7 @@ def init_project():
             '}\n'
         )
 
-    os.subprocess("git init && git add .")
+    subprocess.run("git init && git add .")
 
     print("✔ Initialized new Rubidium project in ./src")
 
